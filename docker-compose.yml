@@ -32,7 +32,7 @@ services:
       - pecan
     ports:
       - "${TRAEFIK_HTTP_PORT-8000}:${TRAEFIK_HTTP_PORT:-8000}"
-      - "${TRAEFIK_HTTPS_PORT-8443}:${TRAEFIK_HTTPS_PORT:-8444}"
+      - "${TRAEFIK_HTTPS_PORT-8443}:${TRAEFIK_HTTPS_PORT:-8443}"
     labels:
       - "traefik.enable=true"
       - "traefik.backend=traefik"
