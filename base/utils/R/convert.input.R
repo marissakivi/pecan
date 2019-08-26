@@ -106,7 +106,7 @@ convert.input <-
   outname <- utils::tail(unlist(strsplit(outfolder, "/")), n = 1)
   
   PEcAn.logger::logger.info(paste("start CHECK Convert.Inputs", fcn, input.id, host$name, outfolder, 
-                    formatname, mimetype, site.id, start_date, end_date, forecast, ensemble, overwrite))
+                    formatname, mimetype, site.id, start_date, end_date, forecast, ensemble))
   
   
   ##----------------------------------------------------------------------------------------------------------------##  
@@ -303,7 +303,6 @@ convert.input <-
       existing.input$end_date   <- lubridate::force_tz(lubridate::as_date(existing.input$end_date), "UTC")
       
       ## Do overwrite if set to TRUE
-      
       if(overwrite){
         # collect files to flag for deletion
         files.to.delete <- PEcAn.remote::remote.execute.R( paste0("list.files('",
@@ -669,7 +668,7 @@ convert.input <-
     # perform conversion on local or remote host
     
     fcn.args <- input.args
-    fcn.args$overwrite  <- overwrite 
+    fcn.args$overwrite  <- overwrite
     fcn.args$in.path    <- dbfile$file_path
     fcn.args$in.prefix  <- dbfile$file_name
     fcn.args$outfolder  <- outfolder
@@ -682,7 +681,6 @@ convert.input <-
     }
      
     arg.string <- listToArgString(fcn.args)
-    PEcAn.logger::logger.info('arg.string is',arg.string)
     
     if (!missing(format.vars)) {
       arg.string <- paste0(arg.string, ", format=", paste0(list(format.vars)))
