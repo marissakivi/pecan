@@ -164,6 +164,7 @@ sda.enkf <- function(settings,
   if(!file.exists(file.path(settings$outdir, "ensemble_weights.Rdata"))){
     PEcAn.logger::logger.warn("ensemble_weights.Rdata cannot be found. Make sure you generate samples by running the get.ensemble.weights function before running SDA if you want the ensembles to be weighted.")
     #create null list
+    weight_list <- list()
     for(tt in 1:length(obs.times)){
       weight_list[[tt]] <- rep(1,nens) #no weights
     }

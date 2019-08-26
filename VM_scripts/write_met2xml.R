@@ -1,8 +1,7 @@
 #write met to xml format
 #example: <path2>/home/araiho/linkages_ens_hf_met//bcc-csm1-1_001.01/climate.Rdata</path2> 
 
-#ens_wts <- read.csv(settings$run$inputs$ensembleweights$path)
-ens_wts <- read.csv('/data/dbfiles/met_data/HARVARD/weights/monte-carlo-ensemble_weights-HARVARD-prism.csv')
+ens_wts <- read.csv(settings$run$inputs$ensembleweights$path)
 
 clim_mods <- unique(ens_wts$climate_model)
 

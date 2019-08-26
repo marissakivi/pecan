@@ -14,7 +14,7 @@ con = DBI::dbConnect(drv,
                      )
 
 #2. set variables for input file
-in.path = '/data/dbfiles/met_data/HARVARD/linkages/CCSM4_001.01' ## path to file directory (not including file name)
+in.path = '/data/dbfiles/met_data/HARVARD/linkages/bcc.csm1.1_001.02/' ## path to file directory (not including file name)
 in.prefix = 'climate.Rdata' ## file name, can be empty if multiple files in directory
 siteid = 1000000650 ## site id number, directions on how to obtain in google doc
 startdate = '0850-01-01 00:00:00' ## adjust date years as needed for available data

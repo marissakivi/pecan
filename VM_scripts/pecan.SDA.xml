@@ -1,0 +1,221 @@
+<?xml version="1.0"?>
+<pecan>
+  <state.data.assimilation>
+  <overwrite>TRUE</overwrite>
+  <n.ensemble>100</n.ensemble>
+  <process.variance>TRUE</process.variance>
+  <adjustment>TRUE</adjustment>
+  <sample.parameters>TRUE</sample.parameters>
+  <inputs>
+   <file>
+    <input.id>1000013298</input.id>
+    <path>
+     <path>/fs/home/araiho/NPP_STAT_MODEL_HF.RDS</path>
+    </path>
+    <operator>direct</operator>
+    <variable.id>1000000132</variable.id>
+    <variable.name>
+     <variable.name>AGB.pft</variable.name>
+    </variable.name>
+   </file>
+   
+  </inputs>
+   <state.variables>
+    <variable>
+      <variable.name>AGB.pft</variable.name>
+      <variable.id>1000000132</variable.id>
+      <unit>MgC/ha/yr</unit>
+      <min_value>0</min_value>
+      <max_value>100000000</max_value>
+    </variable>
+  </state.variables>
+  <spin.up>
+    <start.date>1861/01/01</start.date>
+    <end.date>1960/12/31</end.date>
+  </spin.up>
+  <forecast.time.step>year</forecast.time.step>
+  <start.date>1960/01/01</start.date>
+  <end.date>2010/12/31</end.date>
+ </state.data.assimilation>
+ <info>
+  <notes></notes>
+  <userid>-1</userid>
+  <username></username>
+  <date>2019/03/29 03:05:20 +0000</date>
+ </info>
+ <outdir>/fs/data2/output//PEcAn_1000010299</outdir>
+ <database>
+  <bety>
+   <user>bety</user>
+   <password>bety</password>
+   <host>psql-pecan.bu.edu</host>
+   <dbname>bety</dbname>
+   <driver>PostgreSQL</driver>
+   <write>TRUE</write>
+  </bety>
+  <dbfiles>/fs/data1/pecan.data/dbfiles</dbfiles>
+ </database>
+ <pfts>
+  <pft>
+   <name>Acer.Rubrum_Red.Maple</name>
+   <constants>
+    <num>1</num>
+   </constants>
+   <outdir>/fs/data2/output//PEcAn_1000010299/pft/Acer.Rubrum_Red.Maple</outdir>
+   <posteriorid>1000015154</posteriorid>
+  </pft>
+  <pft>
+   <name>Betula.Alleghaniensis_Yellow.Birch</name>
+   <constants>
+    <num>2</num>
+   </constants>
+   <outdir>/fs/data2/output//PEcAn_1000010299/pft/Betula.Alleghaniensis_Yellow.Birch</outdir>
+   <posteriorid>1000015155</posteriorid>
+  </pft>
+  <pft>
+   <name>Fagus.Grandifolia_American.Beech</name>
+   <constants>
+    <num>3</num>
+   </constants>
+   <outdir>/fs/data2/output//PEcAn_1000010299/pft/Fagus.Grandifolia_American.Beech</outdir>
+   <posteriorid>1000015156</posteriorid>
+  </pft>
+  <pft>
+   <name>Quercus.Rubra_Northern.Red.Oak</name>
+   <constants>
+    <num>4</num>
+   </constants>
+   <outdir>/fs/data2/output//PEcAn_1000010299/pft/Quercus.Rubra_Northern.Red.Oak</outdir>
+   <posteriorid>1000015157</posteriorid>
+  </pft>
+ </pfts>
+ <meta.analysis>
+  <iter>3000</iter>
+  <random.effects>FALSE</random.effects>
+  <threshold>1.2</threshold>
+  <update>AUTO</update>
+ </meta.analysis>
+ <ensemble>
+  <size>100</size>
+  <variable>NPP</variable>
+  <samplingspace>
+   <parameters>
+    <method>uniform</method>
+   </parameters>
+   <met>
+    <method>sampling</method>
+   </met>
+  </samplingspace>
+  <start.year>1900</start.year>
+  <end.year>1960</end.year>
+  <ensemble.id>1000021159</ensemble.id>
+ </ensemble>
+ <model>
+  <id>1000000008</id>
+  <type>LINKAGES</type>
+  <revision>R_version</revision>
+  <delete.raw>FALSE</delete.raw>
+  <binary>/home/araiho/linkages_package//</binary>
+ </model>
+ <workflow>
+  <id>1000010299</id>
+ </workflow>
+ <run>
+  <site>
+   <id>1000000650</id>
+   <met.start>0850-01-01 00:00:00</met.start>
+   <met.end>2011-01-01 00:00:00</met.end>
+   <name>Harvard Forest - Lyford Plots (PalEON PHA)</name>
+   <lat>42.53</lat>
+   <lon>-72.18</lon>
+  </site>
+  <inputs>
+    <met>
+    <id>1000000718</id>
+    <path>
+<path2>/home/araiho/linkages_ens_hf_met//bcc-csm1-1_001.01/climate.Rdata</path2> 
+<path3>/home/araiho/linkages_ens_hf_met//bcc-csm1-1_001.02/climate.Rdata</path3> 
+<path4>/home/araiho/linkages_ens_hf_met//bcc-csm1-1_001.03/climate.Rdata</path4> 
+<path6>/home/araiho/linkages_ens_hf_met//CCSM4_001.01/climate.Rdata</path6>      
+<path7>/home/araiho/linkages_ens_hf_met//CCSM4_001.02/climate.Rdata</path7>      
+<path8>/home/araiho/linkages_ens_hf_met//CCSM4_001.03/climate.Rdata</path8>      
+<path9>/home/araiho/linkages_ens_hf_met//CCSM4_004.01/climate.Rdata</path9>      
+<path10>/home/araiho/linkages_ens_hf_met//CCSM4_004.02/climate.Rdata</path10>    
+<path11>/home/araiho/linkages_ens_hf_met//CCSM4_004.03/climate.Rdata</path11>    
+<path12>/home/araiho/linkages_ens_hf_met//CCSM4_011.01/climate.Rdata</path12>    
+<path13>/home/araiho/linkages_ens_hf_met//CCSM4_011.02/climate.Rdata</path13>    
+<path14>/home/araiho/linkages_ens_hf_met//CCSM4_011.03/climate.Rdata</path14>    
+<path15>/home/araiho/linkages_ens_hf_met//CCSM4_013.01/climate.Rdata</path15>    
+<path16>/home/araiho/linkages_ens_hf_met//CCSM4_013.02/climate.Rdata</path16>    
+<path17>/home/araiho/linkages_ens_hf_met//CCSM4_013.03/climate.Rdata</path17>    
+ <path18>/home/araiho/linkages_ens_hf_met//CCSM4_022.01/climate.Rdata</path18>    
+<path19>/home/araiho/linkages_ens_hf_met//CCSM4_022.02/climate.Rdata</path19>    
+<path20>/home/araiho/linkages_ens_hf_met//CCSM4_022.03/climate.Rdata</path20>    
+<path21>/home/araiho/linkages_ens_hf_met//CCSM4_031.01/climate.Rdata</path21>    
+<path22>/home/araiho/linkages_ens_hf_met//CCSM4_031.02/climate.Rdata</path22>    
+<path23>/home/araiho/linkages_ens_hf_met//CCSM4_031.03/climate.Rdata</path23>    
+<path24>/home/araiho/linkages_ens_hf_met//CCSM4_032.01/climate.Rdata</path24>    
+<path25>/home/araiho/linkages_ens_hf_met//CCSM4_032.02/climate.Rdata</path25>    
+<path26>/home/araiho/linkages_ens_hf_met//CCSM4_032.03/climate.Rdata</path26>    
+<path27>/home/araiho/linkages_ens_hf_met//CCSM4_036.01/climate.Rdata</path27>    
+<path28>/home/araiho/linkages_ens_hf_met//CCSM4_036.02/climate.Rdata</path28>    
+<path29>/home/araiho/linkages_ens_hf_met//CCSM4_036.03/climate.Rdata</path29>    
+<path30>/home/araiho/linkages_ens_hf_met//MIROC-ESM_004.01/climate.Rdata</path30>
+<path31>/home/araiho/linkages_ens_hf_met//MIROC-ESM_004.02/climate.Rdata</path31>
+<path32>/home/araiho/linkages_ens_hf_met//MIROC-ESM_004.03/climate.Rdata</path32>
+<path33>/home/araiho/linkages_ens_hf_met//MIROC-ESM_011.01/climate.Rdata</path33>
+<path34>/home/araiho/linkages_ens_hf_met//MIROC-ESM_011.02/climate.Rdata</path34>
+<path35>/home/araiho/linkages_ens_hf_met//MIROC-ESM_011.03/climate.Rdata</path35>
+<path36>/home/araiho/linkages_ens_hf_met//MIROC-ESM_013.01/climate.Rdata</path36>
+<path37>/home/araiho/linkages_ens_hf_met//MIROC-ESM_013.02/climate.Rdata</path37>
+<path38>/home/araiho/linkages_ens_hf_met//MIROC-ESM_013.03/climate.Rdata</path38>
+<path39>/home/araiho/linkages_ens_hf_met//MIROC-ESM_020.01/climate.Rdata</path39>
+<path40>/home/araiho/linkages_ens_hf_met//MIROC-ESM_020.02/climate.Rdata</path40>
+<path41>/home/araiho/linkages_ens_hf_met//MIROC-ESM_020.03/climate.Rdata</path41>
+<path42>/home/araiho/linkages_ens_hf_met//MIROC-ESM_021.01/climate.Rdata</path42>
+<path43>/home/araiho/linkages_ens_hf_met//MIROC-ESM_021.02/climate.Rdata</path43>
+<path44>/home/araiho/linkages_ens_hf_met//MIROC-ESM_021.03/climate.Rdata</path44>
+<path45>/home/araiho/linkages_ens_hf_met//MIROC-ESM_022.01/climate.Rdata</path45>
+<path46>/home/araiho/linkages_ens_hf_met//MIROC-ESM_022.02/climate.Rdata</path46>
+<path47>/home/araiho/linkages_ens_hf_met//MIROC-ESM_022.03/climate.Rdata</path47>
+<path48>/home/araiho/linkages_ens_hf_met//MIROC-ESM_031.01/climate.Rdata</path48>
+<path49>/home/araiho/linkages_ens_hf_met//MIROC-ESM_031.02/climate.Rdata</path49>
+<path50>/home/araiho/linkages_ens_hf_met//MIROC-ESM_031.03/climate.Rdata</path50>
+<path51>/home/araiho/linkages_ens_hf_met//MIROC-ESM_032.01/climate.Rdata</path51>
+<path52>/home/araiho/linkages_ens_hf_met//MIROC-ESM_032.02/climate.Rdata</path52>
+<path53>/home/araiho/linkages_ens_hf_met//MIROC-ESM_032.03/climate.Rdata</path53>
+<path54>/home/araiho/linkages_ens_hf_met//MIROC-ESM_036.01/climate.Rdata</path54>
+<path55>/home/araiho/linkages_ens_hf_met//MIROC-ESM_036.02/climate.Rdata</path55>
+<path56>/home/araiho/linkages_ens_hf_met//MIROC-ESM_036.03/climate.Rdata</path56>
+<path57>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_010.01/climate.Rdata</path57>
+<path58>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_010.02/climate.Rdata</path58>
+<path59>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_010.03/climate.Rdata</path59>
+<path60>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_012.01/climate.Rdata</path60>
+<path61>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_012.02/climate.Rdata</path61>
+<path62>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_012.03/climate.Rdata</path62>
+<path63>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_018.01/climate.Rdata</path63>
+<path64>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_018.02/climate.Rdata</path64>
+<path65>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_018.03/climate.Rdata</path65>
+<path66>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_034.01/climate.Rdata</path66>
+<path67>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_034.02/climate.Rdata</path67>
+<path68>/home/araiho/linkages_ens_hf_met//MPI-ESM-P_034.03/climate.Rdata</path68>
+    </path>
+    <source>CFmet</source>
+   </met>
+  </inputs>
+  <start.date>1900/01/01</start.date>
+  <end.date>1960/12/31</end.date>
+ </run>
+ <host>
+  <name>localhost</name>
+  <rundir>/fs/data2/output//PEcAn_1000010299/run</rundir>
+  <outdir>/fs/data2/output//PEcAn_1000010299/out</outdir>
+ </host>
+ <settings.info>
+  <deprecated.settings.fixed>TRUE</deprecated.settings.fixed>
+  <settings.updated>TRUE</settings.updated>
+  <checked>TRUE</checked>
+ </settings.info>
+ <rundir>/fs/data2/output//PEcAn_1000010299/run</rundir>
+ <modeloutdir>/fs/data2/output//PEcAn_1000010299/out</modeloutdir>
+</pecan>

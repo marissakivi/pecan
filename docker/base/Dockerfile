@@ -28,6 +28,8 @@ RUN cd /pecan && make && rm -rf /tmp/downloaded_packages
 # COPY WORKFLOW
 WORKDIR /work
 COPY web/workflow.R /work/
+COPY docker/executor/executor.py /work/
+COPY docker/executor/sender.py /work/
 
 # COMMAND TO RUN
 CMD Rscript --vanilla workflow.R | tee workflow.Rout
@@ -38,3 +40,12 @@ ENV PECAN_VERSION=${PECAN_VERSION} \
     PECAN_GIT_BRANCH=${PECAN_GIT_BRANCH} \
     PECAN_GIT_CHECKSUM=${PECAN_GIT_CHECKSUM} \
     PECAN_GIT_DATE=${PECAN_GIT_DATE}
+
+# set up for Python script
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-pip \
+    && pip3 install pika==1.0.0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# actual application that will be executed
+CMD python3 /work/executor.py
