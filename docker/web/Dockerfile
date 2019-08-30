@@ -13,11 +13,16 @@ RUN apt-get update \
     && pecl install amqp \
     && docker-php-ext-enable amqp \
     && mkdir -p /data/workflows /data/dbfiles \
-    && chown www-data /data/workflows /data/dbfiles
+    && chown www-data /data/workflows /data/dbfiles 
+
+RUN addgroup --gid 1000 editors \
+    && adduser www-data editors  \
+    && adduser --system --no-create-home -u 1000 --gid 1000 carya 
 
 # ----------------------------------------------------------------------
 # copy webpages
-# ----------------------------------------------------------------------
+# ----------------------------------------------------------------------`
+
 COPY documentation/index_vm.html /var/www/html/index.html
 COPY web /var/www/html/pecan/
 COPY docker/web/config.docker.php /var/www/html/pecan/config.php

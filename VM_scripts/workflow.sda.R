@@ -4,6 +4,7 @@ library(PEcAn.LINKAGES)
 library(PEcAn.visualization)
 library(PEcAn.ED2)
 library(PEcAn.assim.sequential)
+library(PEcAn.remote)
 library(nimble)
 library(lubridate)
 library(PEcAn.visualization)
@@ -29,7 +30,7 @@ if(FALSE){
   
 }
 
-setwd('/home/carya/workflows/PEcAn_98000000048')
+setwd('/data/workflows/PEcAn_98000000051')
 settings <- read.settings("pecan.SDA.xml")
 load('/data/dbfiles/sda.obs.Rdata')
 obs.mean <- obs.list$obs.mean
@@ -44,7 +45,8 @@ control=list(trace=T,
              TimeseriesPlot=T,
              BiasPlot=F,
              plot.title=NULL,
-             debug=FALSE)
+             debug=FALSE,
+             pause = FALSE)
 
 sda.enkf(settings, obs.mean, obs.cov, Q = NULL, restart=F, 
          control=list(trace=T,
