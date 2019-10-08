@@ -47,6 +47,8 @@ FROM pecan/models:${IMAGE_VERSION}
 # SETUP FOR SPECIFIC SIPNET VERSION
 # ----------------------------------------------------------------------
 
+ARG MODEL_VERSION=git
+
 # Setup model_info file
 COPY model_info.json /work/model.json
 RUN sed -i -e "s/@VERSION@/${MODEL_VERSION}/g" \

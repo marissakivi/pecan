@@ -101,3 +101,5 @@ contrib/modellauncher/modellauncher
 .rstudio/*
 rstudio/*
 workflows/*
+data_files/*
+.bash_history

@@ -127,6 +127,7 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
   Pf = cov(X) # Cov Forecast - Goes into tobit2space as initial condition but is re-estimated in tobit space
   
   mu.f <- colMeans(X) #mean Forecast - This is used as an initial condition
+  
   #Observed inputs
   R <- try(solve(Observed$R), silent = F) #putting solve() here so if not invertible error is before compiling tobit2space
   Y <- Observed$Y
@@ -182,7 +183,7 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
     data.tobit2space <<- list(y.ind = x.ind,
                             y.censored = x.censored,
                             mu_0 = rep(0,length(mu.f)),
-                            lambda_0 = diag(length(mu.f),length(mu.f)+1),
+                            lambda_0 = diag(length(mu.f)+1,length(mu.f)),
                             nu_0 = 3,
                             wts = wts)#some measure of prior obs
     

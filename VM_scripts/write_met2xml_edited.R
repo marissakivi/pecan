@@ -11,7 +11,7 @@ avg_wt <- ens_wts$wts
 
 # following cna be used to randomly select n models from list of climate models
 # based on their probability of occurrence 
-clim_use <- sample(x = clim_mods,size = 300,prob = avg_wt,replace = T)
+clim_use <- sample(x = clim_mods, size = 25,prob = avg_wt, replace = T)
 rbind(sort(avg_wt),sort(table(clim_use)))
 
 metdir <- '/data/dbfiles/met_data/HARVARD/linkages/'
@@ -26,7 +26,7 @@ clim_use = clim_mods
 name <- numeric(length(clim_use))
 
 for(i in 1:length(clim_use)){
-  name[i] <- paste0('<path',i+1,'>',metdir,clim_use[i],'/climate.Rdata</path',i+1,'>')
+  name[i] <- paste0('\t\t <path',i,'>',metdir,clim_use[i],'.Rdata</path',i,'>')
 }
 
 writeLines(name)

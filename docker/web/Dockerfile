@@ -17,8 +17,8 @@ RUN apt-get update \
 
 RUN addgroup --gid 1000 editors \
     && adduser www-data editors  \
-    && adduser --system --no-create-home -u 1000 --gid 1000 carya 
-
+    && adduser --system --no-create-home -u 1000 --gid 1000 carya \
+    && usermod -aG sudo carya
 # ----------------------------------------------------------------------
 # copy webpages
 # ----------------------------------------------------------------------`

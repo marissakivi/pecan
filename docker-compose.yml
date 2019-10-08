@@ -265,7 +265,7 @@ services:
 
   # PEcAn sipnet model runner
   sipnet:
-    image: pecan/model-sipnet-r136:${PECAN_VERSION:-develop}
+    image: pecan/model-sipnet-git:${PECAN_VERSION:-develop}
     restart: unless-stopped
     networks:
       - pecan
