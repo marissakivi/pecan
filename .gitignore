@@ -103,3 +103,5 @@ rstudio/*
 workflows/*
 data_files/*
 .bash_history
+linkages_package/*
+VM_scripts/*.csv
