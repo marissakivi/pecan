@@ -33,6 +33,11 @@ met2model.LINKAGES <- function(in.path, in.prefix, outfolder, start_date, end_da
   out.file <- file.path(outfolder, "climate.Rdata")
   # out.file <- file.path(outfolder, paste(in.prefix, strptime(start_date, '%Y-%m-%d'),
   # strptime(end_date, '%Y-%m-%d'), 'dat', sep='.'))
+  
+  # get start/end year since inputs are specified on year basis
+  # use years to check if met data contains all of the necessary years 
+  start_year <- lubridate::year(start_date)
+  end_year <- lubridate::year(end_date)
 
   results <- data.frame(file = c(out.file),
                         host = c(PEcAn.remote::fqdn()),
@@ -56,7 +61,8 @@ met2model.LINKAGES <- function(in.path, in.prefix, outfolder, start_date, end_da
     data_start = min(rownames(temp.mat))
     data_end = max(rownames(temp.mat))
     
-    # check to see if needed years fall into the current span, if not, rewrite 
+    # check to see if needed years fall into the current data year span; if not, rewrite
+
     if ((data_start <= start_year) & (data_end >= end_year)){
       PEcAn.logger::logger.debug("File '", out.file, "' already exists, skipping to next file.")
       return(invisible(results))
@@ -71,10 +77,6 @@ met2model.LINKAGES <- function(in.path, in.prefix, outfolder, start_date, end_da
   }
 
   out <- NULL
-
-  # get start/end year since inputs are specified on year basis
-  start_year <- lubridate::year(start_date)
-  end_year <- lubridate::year(end_date)
 
   year <- sprintf("%04d", seq(start_year, end_year, 1))
   month <- sprintf("%02d", seq(1, 12, 1))
@@ -96,6 +98,11 @@ met2model.LINKAGES <- function(in.path, in.prefix, outfolder, start_date, end_da
     dt <- PEcAn.utils::seconds_in_year(as.numeric(year[i])) / length(sec)
     tstep <- 86400 / dt
     
+<<<<<<< HEAD
+=======
+    # adjust vector depending on the time step of data 
+    # assumes evenly-spaced measurements
+>>>>>>> 205c2e46dfc11b686dfa30bbdfe4e3ad6cce3ee5
     DOY_vec_hr <- c(1, c(32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 365) * as.integer(tstep))
 
     ncprecipf <- ncdf4::ncvar_get(ncin, "precipitation_flux")  # units are kg m-2 s-1
