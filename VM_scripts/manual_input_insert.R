@@ -10,21 +10,21 @@ con = DBI::dbConnect(drv,
                      host = 'postgres',
                      dbname = 'bety',
                      user = 'bety',
-                     password = 'bety'f
+                     password = 'bety'
                      )
 
 #2. set variables for input file
-in.path = '/data/dbfiles/met_data/HARVARD/linkages' ## path to file directory (not including file name)
-in.prefix = 'bcc.csm1.1_001.03.Rdata' ## file name, can be empty if multiple files in directory
-siteid = 1000000650 ## site id number, directions on how to obtain in google doc
-startdate = '0850-01-01 00:00:00' ## adjust date years as needed for available data
+in.path = '/data/dbfiles/met_data/ROOSTER/linkages' ## path to file directory (not including file name)
+in.prefix = 'bcc.csm1.1_001.01.Rdata'
+siteid = 1000026714 ## site id number, directions on how to obtain in google doc
+startdate = '1600-01-01 00:00:00' ## adjust date years as needed for available data
 enddate = '2015-12-31 00:00:00' 
 
 # do not change these if entering linkages input data
 mimetype = 'text/plain'
 formatname = 'LINKAGES met'
 
-#3. insert input and file record in database
+#3. insert input and file record in database (for met ensembles, only need to enter one of the ensembles for use in our workflow)
 library(PEcAn.DB)
 library(DBI)
 file_input = PEcAn.DB::dbfile.input.insert(in.path = in.path,
@@ -36,24 +36,6 @@ file_input = PEcAn.DB::dbfile.input.insert(in.path = in.path,
                                  formatname = formatname,
                                  con = con,
                                  hostname = 'docker')
-
-# 4 insert file records in database for met ensemble iteratively
-files = list.files(in.path, full.names = FALSE)[-1]
-for (file in files){
-  file_input = dbfile.input.insert(in.path = in.path,
-                                             in.prefix = file,
-                                             siteid = siteid,
-                                             startdate = startdate,
-                                             enddate = enddate, 
-                                             mimetype = mimetype,
-                                             formatname = formatname,
-                                             con = con,
-                                             hostname = 'docker',
-                                             ens = TRUE)
-}
-
-
-
 
 ########################################################################################
 ########################################################################################

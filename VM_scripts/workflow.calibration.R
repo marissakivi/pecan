@@ -6,6 +6,8 @@
 # script => update_bety_priors.R
 
 # II. Run dry run on PEcAn interface
+
+# III. Set run-specific variables
 library(PEcAn.all)
 library(dplyr)
 library(ggplot2)
@@ -25,7 +27,7 @@ nspec = length(settings$pfts)
 nyear = 100
 runs = list.dirs('./out', full.names = FALSE)[-1]
 
-# III. Visual check
+# IV. Visual check
 
 dbh.array = array(0,dim=c(200,nyear,nens))
 ntrees.array = array(0,dim=c(nspec,nyear,nens))
@@ -127,7 +129,7 @@ pl <- ggraph(hData, layout = 'circlepack', weight="size") +
   theme_void()
 pl
 
-# IV. Investigate model output for weird behaviors
+# V. Investigate model output for weird behaviors
 
 # is the species unable to regenerate/seed?
 
@@ -304,4 +306,38 @@ lgf.melt$species = as.factor(lgf.melt$species)
 lgf.melt %>% ggplot(aes(x=year, y=lgf.val, col=lgf)) +
   geom_point() +
   geom_jitter() +
+  facet_wrap(~species)
+
+# is the species being killed too early/often?
+
+# check:
+death.array = array(0,dim=c(nspec,nyear,nens))
+for (i in 1:nens){ # loop through ensembles
+  load(paste0('./out/',runs[i],'/linkages.out.Rdata'))
+  for (j in 1:nyear){
+    death.array[,j,i] = (ntrees.birth[,j,1] - ntrees.kill[,j,1])/ntrees.birth[,j,1]
+  }
+}
+death.melt = reshape::melt(death.array)
+colnames(death.melt) = c('species','year','ensemble','deaths')
+death.melt$species = as.factor(death.melt$species)
+
+death.melt %>%
+  ggplot(aes(x=year,y=deaths,col=species, group=species)) +
+  geom_line() +
+  facet_wrap(~ensemble) +
+  scale_color_manual(
+    values = sppcol,
+    limits = c(1,2,3,4),
+    name = 'species',
+    labels = sppname
+  )
+
+# diagnose: 
+
+# track number of percentage of nogro trees for each species and compare with death rates
+nogro.death.melt = left_join(death.melt,nogro.melt, by = c('species','year','ensemble'))
+nogro.death.melt %>% 
+  ggplot(aes(x=year,y=deaths,size=count,col=ensemble,group=ensemble)) + 
+  geom_point() +
   facet_wrap(~species)

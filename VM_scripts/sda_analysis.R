@@ -1,11 +1,5 @@
 ## SDA Analysis Script
 
-# To do:
-# - figure out settings file variables
-# - which parameters do we want?
-# - do we adjust the last year of SDA?
-# - add adjusted agb to restart file?
-
 # What years do analysis and forecast correspond to ???
 
 # go through and find which variables we need to keep after collection step... we don't need everything
@@ -15,7 +9,9 @@
 ##########################################
 
 rm(list=ls())
-library(PEcAn.all)
+library(mvtnorm)
+library(PEcAn.workflow)
+library(PEcAn.settings)
 library(ggplot2)
 library(gridExtra)
 library(boot)
@@ -44,6 +40,13 @@ param.array = array(NA, dim= c(nspec, nparam, nens))
 param.names = c('DMAX','DMIN','B3','B2','AGEMX','G','SPRTND','SPRTMN','SPRTMX','MPLANT','D3','FROST',
                 'CM1','CM2','CM3','CM4','CM5','FWT','SLTA','SLTB')
 
+# coordinates for sites 
+coords = matrix(NA, 4, 2)
+coords[1,] = c() # HF
+coords[2,] = c() # RH
+coords[3,] = c() # NRP
+coords[4,] = c() # GE
+
 # life.melt 
 birth.array = array(NA, dim=c(nens, nyr, nspec))
 growth.array = array(NA, dim =c(nens, nyr, nspec))
@@ -58,7 +61,7 @@ tot.bias.mat = matrix(NA,nens,nyr)
 # run.list 
 obs = nens * nyr
 run.mat = matrix(NA, obs, 17)
-colnames(run.mat) = c('ens','year','pred','bias','weight','summer.temp','winter.temp','summer.precip','winter.precip',
+colnames(run.mat) = c('ens','year','lat','long','pred','bias','weight','summer.temp','winter.temp','summer.precip','winter.precip',
                       'g.season','basal.area','algf25', 'algf50', 'algf75','sngf','stand.age',
                       'dominant')
 run.mat = as.data.frame(run.mat)
@@ -193,6 +196,13 @@ colnames(bias.melt) = c('ensemble','year','bias')
 rm(birth.melt, growth.melt, death.melt, error.melt)
 
 ############################################
+## Step 2: Determine sensitive parameters ##
+############################################
+
+
+
+
+############################################
 ## Step 2: Determine important parameters ##
 ############################################
 
@@ -201,7 +211,8 @@ rm(birth.melt, growth.melt, death.melt, error.melt)
 np = 3
 cor.params = array(0, dim = c(np,4,nspec)) # s, p, real cor, abs cor 
 for (k in 1:nspec){
-  data = life.melt %>% filter(species == k, abs(error) <= 0.25) %>%
+  data = life.melt %>% filter(species == k) %>%
+  #data = life.melt %>% filter(species == k, abs(error) <= 0.25) %>%
     select(ensemble,year,growth,error) %>% left_join(param.melt, id='ensemble') # change here
   for (s in 1:nspec){
     for (p in 1:nparam){
@@ -242,7 +253,8 @@ for (k in 1:nspec){
     now = now + 1
     s = cor.params[i,1,k]
     p = cor.params[i,2,k]
-    df = life.melt %>% filter(species == k, abs(error) <= 0.25) %>%
+    #df = life.melt %>% filter(species == k, abs(error) <= 0.25) %>%
+    df = life.melt %>% filter(species == k) %>%
       select(ensemble,year,growth,error) %>% left_join(param.melt, id='ensemble') %>% # change here
       filter(p.name == p, species == s)
     pl = ggplot(df, aes(x = p.value, y = error, col = error)) + # change here
@@ -250,10 +262,11 @@ for (k in 1:nspec){
       geom_smooth(method='lm') + 
       labs(x=paste0(settings$pfts[s]$pft$name,'-', param.names[p]), 
            y = paste(settings$pfts[k]$pft$name,'-','rel. model error'))
+    print(pl)
     plot.list[[now]] = ggplotGrob(pl)
   }
 }
-grid.arrange(grobs = plot.list, nrow = 4)
+#grid.arrange(grobs = plot.list, nrow = 4)
 
 
 #################################################
@@ -272,26 +285,74 @@ ggplot(bias.melt, aes(x = year + 1960, y = bias, col = ensemble)) +
 ###############################################################
 
 ## THIS STEP SHOULD INCLUDE OBSERVATIONS FROM ALL SITES
+## ONLY CONSIDERING ONE SPECIES AT A TIME RIGHT NOW
 
 k = 1
-data = run.list[[k]] %>% filter(abs(bias) <= 0.25)
 
+########################################
+# A. Predictors of prediction accuracy #
+########################################
+
+# Where does LINKAGES get predictions wrong about each species? # 
+# Basic idea here is to use logistic regression to identify environmental variables which are significant to 
+# correct predictions (binary variable: correct or incorrect) 
+
+# get data from run.list for species
+data = run.list[[k]]
+
+# define good and bad predictions with set accuracy threshold
 lim = 0.25 # 1 is good, 0 is bad
 quality = sapply(data$bias, function(x){ifelse(abs(x) > lim, 0, 1)})
 data$bias = quality
 
-full.model = lm(pred~summer.temp+winter.temp+summer.precip+winter.precip+g.season+basal.area+
-                  algf25+algf50+algf75+sngf+stand.age, data = data)
-summary(full.model)
-
-red.model = lm(pred~summer.temp+summer.precip+basal.area+algf25+stand.age, data = data)
-summary(red.model)
-
-ggplot(data) + geom_point(aes(x = basal.area, y = algf25, col = bias)) #+
-  labs(x = vars[c], y = 'predicted growth')
-
-
+# look at all variables in relationship to classifying bias 
 vars = names(data)[-(1:5)]
+plot.list = list()
+i = 0
+for (c in vars){
+  i = i + 1
+  pl = ggplot(data, aes_string(x=c)) + geom_point(aes(y = bias, col = bias)) +
+    labs(x = c, y = 'prediction accuracy')
+  plot.list[[i]] = ggplotGrob(pl)
+}
+grid.arrange(grobs = plot.list, nrow = 4)
+
+# run full logistic regression to determine significant variables 
+# use summary to determine which variables to put in reduced model 
+full.logreg = glm(bias~summer.temp+winter.temp+summer.precip+winter.precip+g.season+basal.area+
+                  algf25+algf50+algf75+sngf+stand.age, data = data, family = 'binomial')
+summary(full.logreg)
+
+# fit reduced model to check - if variables are not significant here, remove them and run reduced model again
+red.logreg = glm(bias~algf50+sngf, 
+                 family = 'binomial', data = data)
+summary(red.logreg)
+
+# plot the significant features to look for patterns - where are predictions wrong?
+ggplot(data) + geom_point(aes(x = sngf, y = pred, col = as.factor(bias)))
+ggplot(data) + geom_point(aes(x = algf50, y = pred, col = as.factor(bias)))
+ggplot(data) + geom_point(aes(x = basal.area, y = pred, col = as.factor(bias)))
+
+# matrix of histograms to look for patterns in terms of bias that may have been missed
+plot.list2 = list()
+i = 1
+for (c in vars){
+  pl = ggplot(data = data, aes_string(x = c)) + 
+    geom_histogram(aes(fill = as.factor(bias))) +
+    labs(x = c) + 
+    theme(legend.position = 'none')
+  plot.list2[[i]] = ggplotGrob(pl)
+  i = i + 1
+}
+grid.arrange(grobs = plot.list2, nrow = 4)
+
+###################################
+# A. Predictors of species growth #
+###################################
+
+
+
+
 plot.list = list()
 for (c in 1:length(vars)){
   pl = ggplot(data) + geom_point(aes(x = data[,(5+c)], y = pred, col = bias)) +
@@ -300,18 +361,25 @@ for (c in 1:length(vars)){
 }
 grid.arrange(grobs = plot.list, nrow = 4)
 
+full.model = lm(pred~summer.temp+winter.temp+summer.precip+winter.precip+g.season+basal.area+
+                  algf25+algf50+algf75+sngf+stand.age, data = data)
+summary(full.model)
+
+red.model = lm(pred~summer.temp+summer.precip+basal.area+algf25+stand.age, data = data)
+summary(red.model)
+
+# matrix of scatterplots
+cols = rep(NA,length(data$bias))
+cols[data$bias == 0] <- 'red'
+cols[data$bias == 1] <- 'blue'
+pairs(~summer.temp+summer.precip+basal.area+algf25+stand.age,
+      lower.panel=panel.smooth, pch=20, cex = 0.5, col = cols, 
+      data = data, main="Iris Scatterplot Matrix")
+
+
+
 
 ## FUNCTIONS ## 
-
-lm_eqn <- function(df){
-  m <- lm(df[,2]~df[,1]);
-  eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
-                   list(a = format(unname(coef(m)[1]), digits = 2),
-                        b = format(unname(coef(m)[2]), digits = 2),
-                        r2 = format(summary(m)$r.squared, digits = 3)))
-  as.character(as.expression(eq));
-}
-
 
 weight = function(X,mu.a,Pa){
   

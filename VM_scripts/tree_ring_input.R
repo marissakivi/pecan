@@ -8,14 +8,15 @@
 setwd('/fs/data2/output/PEcAn_1000010510')
 
 library(plyr)
-library(PEcAn.all)
+library(PEcAn.settings)
+
 
 input <- readRDS('/data/dbfiles/NPP_STAT_MODEL_HF.RDS')
 
-levels(input$taxon)[3] <- 'BEAL2'
-levels(input$taxon)[8] <- 'FRAM2'#7
+#levels(input$taxon)[3] <- 'BEAL2' # Harvard Forest
+#levels(input$taxon)[8] <- 'FRAM2'#7 Harvard Forest
 
-#levels(input$taxon)[4] <- 'PIGL' #HACK for Rooster Hill
+levels(input$taxon)[4] <- 'PIGL' #HACK for Rooster Hill
 
 levels(input$type)[1] <- 'ab'
 levels(input$type)[2] <- 'abi'

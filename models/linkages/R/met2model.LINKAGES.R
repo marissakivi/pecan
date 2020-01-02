@@ -98,11 +98,8 @@ met2model.LINKAGES <- function(in.path, in.prefix, outfolder, start_date, end_da
     dt <- PEcAn.utils::seconds_in_year(as.numeric(year[i])) / length(sec)
     tstep <- 86400 / dt
     
-<<<<<<< HEAD
-=======
     # adjust vector depending on the time step of data 
     # assumes evenly-spaced measurements
->>>>>>> 205c2e46dfc11b686dfa30bbdfe4e3ad6cce3ee5
     DOY_vec_hr <- c(1, c(32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 365) * as.integer(tstep))
 
     ncprecipf <- ncdf4::ncvar_get(ncin, "precipitation_flux")  # units are kg m-2 s-1

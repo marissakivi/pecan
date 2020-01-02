@@ -21,10 +21,11 @@ rm(list=ls())
 
 # For this step, you will need the workflow ID from your spin-up. Adjust the variable below accordingly.  
 
-ID = '14000000018'
+ID = '14000000036'
 
 # load necessary libraries
-library(PEcAn.all)
+library(PEcAn.settings)
+library(PEcAn.uncertainty)
 library(PEcAn.SIPNET)
 library(PEcAn.LINKAGES)
 library(PEcAn.visualization)
@@ -36,6 +37,8 @@ library(lubridate)
 library(PEcAn.visualization)
 library(rgdal) # need to put in assim.sequential
 library(ncdf4) # need to put in assim.sequential
+library(dplyr)
+library(dbplyr)
 
 # set working directory to workflow info
 setwd(paste0('/data/workflows/PEcAn_',ID))
@@ -99,7 +102,7 @@ setwd(paste0('/data/workflows/PEcAn_',ID))
 # to be assimilated into the model. 
 
 # load transformed and reformatted observation data 
-load('/data/dbfiles/sda.obs.Rdata')
+load('/data/dbfiles/sda.obs.RH.Rdata')
 obs.mean <- obs.list$obs.mean
 obs.cov <- obs.list$obs.cov
 
@@ -144,8 +147,8 @@ if (control$debug) browser()
 ###-------------------------------------------------------------------###
 ### 1. read settings                                                  ###
 ###-------------------------------------------------------------------###
-
-adjustment <- as.logical(settings$state.data.assimilation$adjustment)
+weight_list <- list()
+adjustment <- settings$state.data.assimilation$adjustment
 model      <- settings$model$type
 write      <- settings$database$bety$write
 defaults   <- settings$pfts
@@ -154,7 +157,7 @@ rundir     <- settings$host$rundir
 host       <- settings$host
 forecast.time.step <- settings$state.data.assimilation$forecast.time.step  #idea for later generalizing
 nens       <- as.numeric(settings$ensemble$size)
-processvar <- settings$state.data.assimilation$process.variance %>% as.logical()
+processvar <- as.logical(settings$state.data.assimilation$process.variance)
 var.names <- sapply(settings$state.data.assimilation$state.variable, '[[', "variable.name")
 names(var.names) <- NULL
 input.vars <- sapply(settings$state.data.assimilation$inputs, '[[', "variable.name")
@@ -163,10 +166,10 @@ operators <- sapply(settings$state.data.assimilation$inputs, '[[', "operator")
 # site details
 # first col is the long second is the lat and row names are the site ids
 site.ids <- settings$run$site$id
-site.locs <- data.frame(Lon=settings$run$site$lon %>% as.numeric,
-                        Lat=settings$run$site$lat %>% as.numeric) %>%
-  `colnames<-`(c("Lon","Lat")) %>%
-  `rownames<-`(site.ids)
+site.locs <- data.frame(Lon = as.numeric(settings$run$site$lon),
+                        Lat = as.numeric(settings$run$site$lat))
+colnames(site.locs) <- c("Lon","Lat")
+rownames(site.locs) <- site.ids
 
 # determine years for data assimilation
 # start cut determines what is the best year to start spliting the met based on if we start with a restart or not.  
@@ -222,7 +225,7 @@ if(!no_split){
                                                              start.time = start.cut, 
                                                              stop.time = lubridate::ymd_hms(settings$state.data.assimilation$end.date, truncated = 3, tz="UTC"),
                                                              inputs =  settings$run$inputs$met$path[[i]],
-                                                             overwrite=F)) 
+                                                             overwrite=T)) 
   }
 }
 
@@ -232,7 +235,7 @@ if(!no_split){
 
 # getting times where we have observations
 # there will be an error if we need to fix them in next step
-obs.times <- as.Date(names(obs.mean),format = "%Y/%m/%d")
+obs.times <- names(obs.mean)
 obs.times.POSIX <- lubridate::ymd_hms(obs.times)
 
 ### TO DO: Need to find a way to deal with years before 1000 for paleon ### need a leading zero
@@ -262,8 +265,8 @@ FORECAST    <- ANALYSIS <- list()
 enkf.params <- list()
 
 # shape parameters estimated over time for process covariance
-aqq         <- list() 
-bqq         <- list() 
+aqq         <- NULL
+bqq         <- numeric(nt + 1)
 
 # track range of state variables 
 # interval remade everytime depending on data at time t
@@ -278,9 +281,8 @@ rownames(state.interval) <- var.names
 if(!file.exists(file.path(settings$outdir, "ensemble_weights.Rdata"))){
   PEcAn.logger::logger.warn("ensemble_weights.Rdata cannot be found. Make sure you generate samples by running the get.ensemble.weights function before running SDA if you want the ensembles to be weighted.")
   #create null list
-  weight_list <- list()
   for(tt in 1:length(obs.times)){
-    weight_list[[tt]] <- rep(1,nens) # no weights
+    weight_list[[tt]] <- rep(1,nens) #no weights
   }
 } else{
   load(file.path(settings$outdir, "ensemble_weights.Rdata"))  ## loads ensemble.samples
@@ -312,7 +314,7 @@ if (restart){
   ensemble.id <- outconfig$ensemble.id
   
   # if you made it through the forecast and the analysis in t and failed on the analysis in t+1 so you didn't save t
-  if(length(FORECAST) == length(ANALYSIS) && length(FORECAST) > 0) t = t + 1 
+  if(length(FORECAST) == length(ANALYSIS) && length(FORECAST) > 0) t = t + length(FORECAST) 
   
 }else{
   t = 1
@@ -352,10 +354,10 @@ for(t in t:nt){
       sum(unlist(sapply(
         X = run.id,
         FUN = function(x){
-          pattern = paste0(x, '/', obs.year, '.nc')[1]
+          pattern = paste0(x, '/*.nc$')[1]
           grep(
             pattern = pattern,
-            x = list.files(file.path(outdir,x), "*.nc", recursive = F, full.names = T)
+            x = list.files(file.path(outdir,x), "*.nc$", recursive = F, full.names = T)
           )
         },
         simplify = T
@@ -413,8 +415,8 @@ for(t in t:nt){
 
     if(exists('new.state')){
       restart.arg<-list(runid = run.id, 
-                        start.time = strptime(obs.times[t-1],format="%Y-%m-%d %H:%M:%S"),
-                        stop.time = strptime(obs.times[t],format="%Y-%m-%d %H:%M:%S"), 
+                        start.time = lubridate::ymd_hms(obs.times[t - 1], truncated = 3),
+                        stop.time = lubridate::ymd_hms(obs.times[t], truncated = 3), 
                         settings = settings,
                         new.state = new.state, 
                         new.params = new.params, 
@@ -495,11 +497,20 @@ for(t in t:nt){
       new.params[[i]] <- X_tmp[[i]]$params
   }
   
+  #changing the extension of nc files to a more specific date related name
+  files <-  list.files(
+    path = file.path(settings$outdir, "out"),
+    "*.nc$",
+    recursive = TRUE,
+    full.names = TRUE)
+  files <-  files[grep(pattern = "SDA*", files, invert = TRUE)]
+  
+  file.rename(files, 
+              file.path(dirname(files), 
+                        paste0("SDA_", basename(files), "_", gsub(" ", "", names(obs.mean)[t]), ".nc") ) )
+  
   # set up variables for analysis
   X <- do.call(rbind, X)
-  FORECAST[[t]] <- X
-  mu.f <- colMeans(X)
-  Pf <- cov(X)
   
   # check to make sure there are successful forecasts 
   if(sum(X,na.rm=T) == 0){
@@ -517,8 +528,8 @@ for(t in t:nt){
     names(input.order) <- operators 
     input.order.cov <- sapply(input.vars, agrep, x=colnames(obs.cov[[t]]))
     names(input.order.cov) <- operators
-    choose <- sapply(colnames(X), agrep, x=names(obs.mean[[t]]), max=1, USE.NAMES = F) %>% unlist
-    choose.cov <- sapply(colnames(X), agrep, x=colnames(obs.cov[[t]]), max=1, USE.NAMES = F) %>% unlist
+    choose <- unlist(sapply(colnames(X), agrep, x=names(obs.mean[[t]]), max=1, USE.NAMES = F))
+    choose.cov <- unlist(sapply(colnames(X), agrep, x=colnames(obs.cov[[t]]), max=1, USE.NAMES = F))
     
     # I'm unsure what this section is for 
     if(!any(choose)){
@@ -541,6 +552,7 @@ for(t in t:nt){
     
     # making the mapping matrix between observed data and their forecast state variables
     # TO DO: doesn't work unless it's one to one
+    #if(length(operators)==0) H <- Construct_H(choose, Y, X)
     H <- Construct_H(choose, Y, X)
     
     ###------------------------###
@@ -583,6 +595,7 @@ for(t in t:nt){
                                      obs.cov=obs.cov)
     
     # reading back analysis state variable variables for forecast . . 
+    FORECAST[[t]] <- X
     mu.f <- enkf.params[[t]]$mu.f
     Pf <- enkf.params[[t]]$Pf
     # and analysis
