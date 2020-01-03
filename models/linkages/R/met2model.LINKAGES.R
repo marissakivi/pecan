@@ -96,8 +96,11 @@ met2model.LINKAGES <- function(in.path, in.prefix, outfolder, start_date, end_da
     dt <- PEcAn.utils::seconds_in_year(as.numeric(year[i])) / length(sec)
     tstep <- 86400 / dt
     
-    DOY_vec_hr <- c(1, c(32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 365) * as.integer(tstep))
-
+    # check to make sure it isn't a leap year
+    leap = lubridate::leap_year(as.numeric(year[i]))
+    DOY_vec_hr <- c(1, c(32, 61, 92, 122, 153, 183, 214, 245, 275, 306, 336, 366) * as.integer(tstep))
+    if(leap) DOY_vec_hr[2:12] = DOY_vec_hr[2:12] + 1
+    
     ncprecipf <- ncdf4::ncvar_get(ncin, "precipitation_flux")  # units are kg m-2 s-1
     for (m in 1:12) {
       month_matrix_precip[i, m] <- (sum(ncprecipf[DOY_vec_hr[m]:(DOY_vec_hr[m + 1] - 1)]) * dt / 10)
