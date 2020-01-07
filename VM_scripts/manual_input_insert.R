@@ -14,17 +14,17 @@ con = DBI::dbConnect(drv,
                      )
 
 #2. set variables for input file
-in.path = '/data/dbfiles/met_data/HARVARD/linkages/bcc.csm1.1_001.02/' ## path to file directory (not including file name)
-in.prefix = 'climate.Rdata' ## file name, can be empty if multiple files in directory
-siteid = 1000000650 ## site id number, directions on how to obtain in google doc
-startdate = '0850-01-01 00:00:00' ## adjust date years as needed for available data
+in.path = '/data/dbfiles/met_data/ROOSTER/linkages' ## path to file directory (not including file name)
+in.prefix = 'bcc.csm1.1_001.01.Rdata'
+siteid = 1000026714 ## site id number, directions on how to obtain in google doc
+startdate = '1600-01-01 00:00:00' ## adjust date years as needed for available data
 enddate = '2015-12-31 00:00:00' 
 
 # do not change these if entering linkages input data
 mimetype = 'text/plain'
 formatname = 'LINKAGES met'
 
-#3. insert input and file record in database
+#3. insert input and file record in database (for met ensembles, only need to enter one of the ensembles for use in our workflow)
 library(PEcAn.DB)
 library(DBI)
 file_input = PEcAn.DB::dbfile.input.insert(in.path = in.path,
@@ -45,7 +45,7 @@ library(XML)
 library(dplyr)
 library(PEcAn.data.land)
 workdir = '/home/carya'
-PEcAn.data.land::extract_soil_gssurgo(outdir = workdir,lat = 43.068496,lon = -73.297425)
+PEcAn.data.land::extract_soil_gssurgo(outdir = workdir,lat = 47.1950765,lon = -95.1648107)
 ncin <- ncdf4::nc_open(file.path(workdir,'gSSURGO_soil_2.nc'))
 print(paste('%clay =',ncdf4::ncvar_get(ncin,'fraction_of_clay_in_soil')[1]*100))
 print(paste('%sand =',ncdf4::ncvar_get(ncin,'fraction_of_sand_in_soil')[1]*100))

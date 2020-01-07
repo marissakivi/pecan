@@ -127,6 +127,7 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
   Pf = cov(X) # Cov Forecast - Goes into tobit2space as initial condition but is re-estimated in tobit space
   
   mu.f <- colMeans(X) #mean Forecast - This is used as an initial condition
+  
   #Observed inputs
   R <- try(solve(Observed$R), silent = F) #putting solve() here so if not invertible error is before compiling tobit2space
   Y <- Observed$Y
@@ -182,7 +183,7 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
     data.tobit2space <<- list(y.ind = x.ind,
                             y.censored = x.censored,
                             mu_0 = rep(0,length(mu.f)),
-                            lambda_0 = diag(length(mu.f),length(mu.f)+1),
+                            lambda_0 = diag(length(mu.f)+1,length(mu.f)),
                             nu_0 = 3,
                             wts = wts)#some measure of prior obs
     
@@ -289,6 +290,12 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
 
   ### create matrix the describes the support for each observed state variable at time t
   interval <- matrix(NA, length(obs.mean[[t]]), 2)
+  # Each observe variable needs to have its own file tag under inputs
+  interval <-settings$state.data.assimilation$inputs %>%
+    purrr::map_dfr( ~ data.frame(
+      .x$'min_value' %>% as.numeric(),.x$'max_value' %>% as.numeric()
+    )) %>%
+    as.matrix()
   rownames(interval) <- names(obs.mean[[t]])
   for(i in 1:length(input.vars)){
     interval[grep(x=rownames(interval),

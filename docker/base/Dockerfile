@@ -47,5 +47,10 @@ RUN apt-get update \
     && pip3 install pika==1.0.0 \
     && rm -rf /var/lib/apt/lists/*
 
+# variables to store in docker image
+ENV RABBITMQ_URI="amqp://guest:guest@rabbitmq/%2F" \
+    RABBITMQ_QUEUE="pecan" \
+    APPLICATION="R CMD BATCH workflow.R"
+
 # actual application that will be executed
 CMD python3 /work/executor.py
