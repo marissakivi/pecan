@@ -34,7 +34,6 @@ COPY docker/executor/sender.py /work/
 # COMMAND TO RUN
 CMD Rscript --vanilla workflow.R | tee workflow.Rout
 
-
 # variables to store in docker image
 ENV PECAN_VERSION=${PECAN_VERSION} \
     PECAN_GIT_BRANCH=${PECAN_GIT_BRANCH} \
