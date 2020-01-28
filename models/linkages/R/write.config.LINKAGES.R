@@ -110,7 +110,7 @@ write.config.LINKAGES <- function(defaults = NULL, trait.values, settings, run.i
   basesc <- 74
   basesn <- 1.64
   
-  spp.params.default <- read.csv(system.file("spp_matrix.csv", package = "linkages"))  # default spp.params
+  spp.params.default <- read.csv("~/models/linkages/inst/spp_matrix.csv")  # default spp.params
   nspec <- length(settings$pfts)
   spp.params.save <- numeric(nspec)
   for (i in seq_len(nspec)) {
