@@ -21,9 +21,11 @@ rm(list=ls())
 
 # For this step, you will need the workflow ID from your spin-up. Adjust the variable below accordingly.  
 
-ID = '14000000036'
+ID = '14000000037'
 
 # load necessary libraries
+library(dplyr)
+library(dbplyr)
 library(PEcAn.settings)
 library(PEcAn.uncertainty)
 library(PEcAn.SIPNET)
@@ -37,8 +39,7 @@ library(lubridate)
 library(PEcAn.visualization)
 library(rgdal) # need to put in assim.sequential
 library(ncdf4) # need to put in assim.sequential
-library(dplyr)
-library(dbplyr)
+
 
 # set working directory to workflow info
 setwd(paste0('/data/workflows/PEcAn_',ID))
@@ -102,9 +103,15 @@ setwd(paste0('/data/workflows/PEcAn_',ID))
 # to be assimilated into the model. 
 
 # load transformed and reformatted observation data 
-load('/data/dbfiles/sda.obs.RH.Rdata')
+load('/data/dbfiles/sda.obs.Rdata')
 obs.mean <- obs.list$obs.mean
 obs.cov <- obs.list$obs.cov
+
+for (i in 1:length(names(obs.mean))){
+  this = names(obs.mean)[i]
+  names(obs.mean)[i] = paste0(substr(this,1,4),'-',substr(this,6,7),'-',substr(this,9,10))
+  names(obs.cov)[i] = paste0(substr(this,1,4),'-',substr(this,6,7),'-',substr(this,9,10))
+}
 
 # load SDA xml as settings file
 settings <- read.settings("pecan.SDA.xml")
@@ -507,7 +514,7 @@ for(t in t:nt){
   
   file.rename(files, 
               file.path(dirname(files), 
-                        paste0("SDA_", basename(files), "_", gsub(" ", "", names(obs.mean)[t]), ".nc") ) )
+                        paste0("SDA_", basename(files)) ) )
   
   # set up variables for analysis
   X <- do.call(rbind, X)

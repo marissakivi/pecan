@@ -33,6 +33,7 @@
 # 1. Set up working environment
 # --------------------------------
 
+library(dplyr)
 library(PEcAn.settings)
 library(PEcAn.uncertainty)
 library(PEcAn.LINKAGES)
@@ -43,6 +44,7 @@ library(PEcAn.visualization)
 library(PEcAn.utils)
 library(PEcAn.DB)
 library(RCurl)
+library(dbplyr)
 rm(list=ls())
 
 # end whatever PEcAn processes might still be running
@@ -56,7 +58,7 @@ options(error=quote({
 }))
 
 # set working directory to workflow folder from spinup 
-workflowID = '14000000036'
+workflowID = '14000000037'
 setwd(paste0('/data/workflows/PEcAn_',workflowID))
 
 # --------------------------------------------------
@@ -86,9 +88,9 @@ setwd(paste0('/data/workflows/PEcAn_',workflowID))
 # them in the /data folder in a previous step. We also need to know how many ensembles you are running. Adjust the 
 # variables below.
 
-ensemble_location = '/data/dbfiles/met_data/ROOSTER/weights/ensemble-weights-ROOSTER-prism.csv'
-metdir <- '/data/dbfiles/met_data/ROOSTER/linkages/'
-n = 25
+ensemble_location = '/data/dbfiles/met_data/HARVARD/weights/ensemble-weights-HARVARD-prism.csv'
+metdir <- '/data/dbfiles/met_data/HARVARD/linkages/'
+n = 15
 
 ### A. Get our sampled list of met ensembles. 
 
@@ -178,7 +180,7 @@ if (PEcAn.utils::status.check("OUTPUT") == 0) {
   PEcAn.utils::status.end()
 }
 
-# run ensemble analysis on model output. 
+# run ensemble analysis on model output
 if ('ensemble' %in% names(settings) & PEcAn.utils::status.check("ENSEMBLE") == 0) {
   PEcAn.utils::status.start("ENSEMBLE")
   PEcAn.uncertainty::runModule.run.ensemble.analysis(settings, TRUE)    
@@ -285,3 +287,4 @@ precip.melt %>%
 temp.melt %>%
   ggplot(aes(x=date, y=temperature, col = ensemble)) + 
   geom_line()
+
