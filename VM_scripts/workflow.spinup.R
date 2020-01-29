@@ -34,6 +34,7 @@
 # --------------------------------
 
 library(dplyr)
+library(dbplyr)
 library(PEcAn.settings)
 library(PEcAn.uncertainty)
 library(PEcAn.LINKAGES)
@@ -44,7 +45,6 @@ library(PEcAn.visualization)
 library(PEcAn.utils)
 library(PEcAn.DB)
 library(RCurl)
-library(dbplyr)
 rm(list=ls())
 
 # end whatever PEcAn processes might still be running
@@ -58,7 +58,7 @@ options(error=quote({
 }))
 
 # set working directory to workflow folder from spinup 
-workflowID = '14000000037'
+workflowID = '14000000041'
 setwd(paste0('/data/workflows/PEcAn_',workflowID))
 
 # --------------------------------------------------
