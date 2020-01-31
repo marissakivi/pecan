@@ -7,19 +7,24 @@
 
 # II. Run dry run on PEcAn interface
 
+rm(list=ls())
+
 # III. Set run-specific variables
-library(PEcAn.all)
 library(dplyr)
 library(ggplot2)
 library(ggraph)
 library(igraph)
 library(RColorBrewer)
+library(PEcAn.all)
 
-workflowID = '14000000031'
+workflowID = '14000000057'
 setwd(paste0('/data/workflows/PEcAn_',workflowID))
 
-sppname = c('red maple', 'yellow birch','beech','red oak')
-sppcol = c('maroon','gold','darkgreen','orange')
+#sppname = c('red maple', 'yellow birch','american beech','red oak','eastern hemlock') #HARVARD
+#sppcol = c('purple','gold','blue','red','darkgreen') #HARVARD
+
+sppname = c('red maple','red spruce','white pine','red oak') #ROOSTER
+sppcol = c('purple','pink','green','red') #ROOSTER
 
 settings = read.settings('pecan.CONFIGS.xml')
 nens = as.numeric(settings$ensemble$size)
@@ -68,7 +73,7 @@ tree.melt %>% mutate(species = as.factor(species)) %>%
   labs(title='Diameter vs. Year') +
   scale_color_manual(
     values = sppcol,
-    limits = c(1,2,3,4),
+    limits = c(1:nspec),
     name = 'species',
     labels = sppname
   ) +
@@ -83,7 +88,7 @@ bins.melt %>% ggplot(aes(x = year, y = dbh, col = species, size = num)) +
   ) +
   scale_color_manual(
     values = sppcol,
-    limits = c(1,2,3,4),
+    limits = c(1:nspec),
     name = 'species',
     labels = sppname
   ) +
@@ -121,7 +126,7 @@ pl <- ggraph(hData, layout = 'circlepack', weight="size") +
   geom_node_circle(aes(fill=species)) +
   scale_fill_manual(
     values = sppcol,
-    limits = c(1,2,3,4),
+    limits = c(1,2,3,4,5),
     name = 'species',
     labels = sppname
     ) +
@@ -152,7 +157,7 @@ birth.melt %>%
   facet_wrap(~ensemble) +
   scale_color_manual(
     values = sppcol,
-    limits = c(1,2,3,4),
+    limits = c(1,2,3,4,5),
     name = 'species',
     labels = sppname
   )
@@ -182,12 +187,14 @@ for (i in 1:nens){ # loop through ensembles
 # prepare for plotting
 gmult.melt = reshape::melt(gmult.array)
 colnames(gmult.melt) = c('species','gmult','year','ensemble','value')
+gmult.melt$species = as.integer(gmult.melt$species)
+birth.melt$species = as.integer(birth.melt$species)
 birth.limit.melt = birth.melt %>%
   right_join(gmult.melt, by = c('species','year','ensemble')) %>%
   filter(births < 1,
          gmult != 3)
 birth.limit.melt$species = as.factor(birth.limit.melt$species)
-birth.limit.melt$species = plyr::mapvalues(birth.limit.melt$species, from = c(1,2,3,4), to = sppname)
+birth.limit.melt$species = plyr::mapvalues(birth.limit.melt$species, from = c(1,2,3,4,5), to = sppname)
 birth.limit.melt$gmult = as.factor(birth.limit.melt$gmult)
 birth.limit.melt$gmult = plyr::mapvalues(birth.limit.melt$gmult,
                                    from = c(1,2,4),
@@ -210,7 +217,7 @@ limit.melt %>%
   geom_histogram(binwidth = 1) +
   scale_fill_manual(
     values = sppcol,
-    limits = c(1,2,3,4),
+    limits = c(1,2,3,4,5),
     name = 'species',
     labels = sppname
   )
@@ -249,11 +256,10 @@ nogro.melt %>%
   facet_wrap(~ensemble) +
   scale_color_manual(
     values = sppcol,
-    limits = c(1,2,3,4),
+    limits = c(1,2,3,4,5),
     name = 'species',
     labels = sppname
   )
-
 
 # diagnose:
 
@@ -306,7 +312,13 @@ lgf.melt$species = as.factor(lgf.melt$species)
 lgf.melt %>% ggplot(aes(x=year, y=lgf.val, col=lgf)) +
   geom_point() +
   geom_jitter() +
-  facet_wrap(~species)
+  facet_wrap(~species) + 
+  scale_color_manual(
+    values = c('gold','blue','red','green'),
+    limits = c(1,2,3,4),
+    name = 'growth factor',
+    labels = c("algf","smgf","sngf","degdgf")
+  )
 
 # is the species being killed too early/often?
 
@@ -328,13 +340,13 @@ death.melt %>%
   facet_wrap(~ensemble) +
   scale_color_manual(
     values = sppcol,
-    limits = c(1,2,3,4),
+    limits = c(1,2,3,4,5),
     name = 'species',
     labels = sppname
   )
 
 # diagnose: 
-
+ 
 # track number of percentage of nogro trees for each species and compare with death rates
 nogro.death.melt = left_join(death.melt,nogro.melt, by = c('species','year','ensemble'))
 nogro.death.melt %>% 

@@ -58,7 +58,7 @@ options(error=quote({
 }))
 
 # set working directory to workflow folder from spinup 
-workflowID = '14000000041'
+workflowID = '14000000047'
 setwd(paste0('/data/workflows/PEcAn_',workflowID))
 
 # --------------------------------------------------

@@ -98,7 +98,6 @@ docker-compose.override.yml
 contrib/modellauncher/modellauncher
 
 # personal folders to ignore
-VM_scripts/*
 data_files/*
 rstudio/*
 .rstudio/*
