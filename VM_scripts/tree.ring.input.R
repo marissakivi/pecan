@@ -22,7 +22,7 @@ library(PEcAn.data.land)
 library(ggplot2)
 
 rm(list=ls())
-site = 'GOOSE'
+site = 'NORTHROUND'
 
 # load and prepare data for all species
 input <- readRDS(paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/NPP_STAT_MODEL_',site,'.RDS'))
@@ -41,8 +41,11 @@ levels(input$type)[2] <- 'abi'
 if (site == 'HARVARD'){
   input = input %>% filter(type == 'ab', model == 'Model RW + Census', !is.na(value)) %>% select(-model, -site_id, -type)
 }else{
-  input = input %>% filter(type == 'ab', !is.na(value)) %>% select(-model, -plot, -type)
+  input = input %>% filter(type == 'ab', !is.na(value)) %>% select(-model, -type)
 }
+
+# for North Round Pond site, we need to separate the data for Plots 1 & 2 and Plots 3 & 4 
+if (site == 'NORTHROUND') input <- input %>% filter(plot %in% c(1,2)) %>% dplyr::select(-plot)
 
 # set up variables for aggregation step
 start_date = min(input$year)
@@ -89,11 +92,11 @@ pl = ggplot(prior_mat) +
   geom_hline(yintercept = 0.98, col = 'red') + 
   labs(title = 'Overall Cumulative Proportion of Biomass by Species', 
        ylab = 'Cumulative Proportion of Biomass')
-ggsave(pl, filename = paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda_priority_spp.jpg'))
+ggsave(pl, filename = paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda_priority_spp_plot12.jpg'))
 pl
 
 # determine which species to keep for modeling (top 98% species are under red line)
-species = c('TSCA','FAGR','QURU','FRAM','BEAL','PIST','ACSA','ACRU')
+species = c('TSCA','QURU','PIST','ACRU')
 
 ################################################################################
 ################################################################################
@@ -113,76 +116,28 @@ unique(melt.next$taxon)
 # 2.) check the README file for RDS file for site to double check common species names
 # 3.) THIS SECTION WILL NEED TO BE ADJUSTED FOR ALL SITES 
 levels(melt.next$taxon)
-levels(melt.next$taxon)[3] = 'BEAL2' # HF, NRP
-levels(melt.next$taxon)[2] = 'ACSA3' # NRP
-levels(melt.next$taxon)[7] = 'FRAM2' # NRP
+#levels(melt.next$taxon)[3] = 'BEAL2' # HF, NRP
+#levels(melt.next$taxon)[2] = 'ACSA3' # NRP
+#levels(melt.next$taxon)[7] = 'FRAM2' # NRP
 #levels(melt.next$taxon)[4] = 'PIRU' # RH
 species = unique(melt.next$taxon)
 species
 
 ################################################################################
-############## RUN THE FOLLOWING CHUNK ON THE VM RSTUDIO SERVER ################
+################################################################################
 ################################################################################
 
-setwd('~/data_files')
+## Part III. Match up species to PFT on BETY database
 
-# CHANGE SPECIES TO BE TOP 98% FOR SITE #
-species = c('ACSA3','BEAL2','FAGR','FRAM2','TSCA')
+# You will need to look at the PFT names that you are going to be using in the BETY 
+# database and match them to the species. These names should be in your priors CSV 
+# file! Traditionally, for LINKAGES, they follow the pattern: Genus.Species_Common.Name
 
-# make bety connection
-bety <- list(user = 'bety',
-             password = 'bety',
-             host = 'postgres',
-             dbname = 'bety',
-             driver = "PostgreSQL",
-             write = TRUE)
-dbcon <- db.open(bety)
-
-# Step 2: Obtain bety pft and species information
-spp_id <- match_species_id(species,format_name = 'usda',dbcon)
-pft_mat = matrix(NA, length(spp_id$genus), 4)
-pft_mat = as.data.frame(pft_mat)
-names(pft_mat) = c('bety_pft_id', 'pft','bety_species_id','latin')
-i = 0
-
-# the following matches the species to a pft in BETY -- upon completion, check to make sure the pfts are correct 
-# if there is an error with the following chunk of code, it is highly likely one of the taxa codes does not line up with 
-# a species in BETY 
-# you can check this by manually looking at each species in the BETY database and making sure the codes line up
-
-for(sppID in spp_id$bety_species_id){
-  i = i + 1
-  genus = spp_id$genus[i]
-  spec = spp_id$species[i]
-  pft.now <- PEcAn.DB::db.query(query = paste("SELECT pfts.id, pfts.name, species.id FROM pfts",
-                                              "JOIN pfts_species ON pfts_species.pft_id = pfts.id",
-                                              "JOIN species ON species.id = pfts_species.specie_id",
-                                              "WHERE species.id =",
-                                              sppID), 
-                                con = dbcon)
-  genus_check = sapply(pft.now$name, function(x){grepl(tolower(genus),tolower(x))})
-  species_check = sapply(pft.now$name, function(x){grepl(tolower(spec),tolower(x))})
-  if (!any(genus_check) & !any(species_check)){
-    print('No pft available that reasonably matches!')
-  }else{
-    pft.now = pft.now[(genus_check & species_check),]
-  }
-  
-  pft_mat[i,1] = pft.now$id
-  pft_mat[i,2] = pft.now$name
-  pft_mat[i,3] = sppID
-  pft_mat[i,4] = paste(genus,spec)
-}
-
-x <- paste0('AGB.pft.', pft_mat$pft)
-names(x) <- spp_id$input_code
-save(x, file = 'obs_pfts.Rdata')
-
-################################################################################
-########################## BACK TO LOCAL MACHINE ###############################
-################################################################################
-
-load('~/Downloads/obs_pfts-4.Rdata')
+x = c('Quercus.Rubra_Northern.Red.Oak.2',
+      'Pinus.Strobus_White.Pine.2',
+      'Acer.Rubrum_Red.Maple.2',
+      'Tsuga.Canadensis_Hemlock.2')
+names(x) = species
 
 # adjust names of taxa to be with PFT name from BETY 
 melt.next$pft.cat <- x[as.character(melt.next$taxon)]
@@ -227,7 +182,7 @@ names(obs.mean) <- paste0(obs.times,'-12-31')
 names(obs.cov) <- paste0(obs.times,'-12-31')
 
 obs.list <- list(obs.mean = obs.mean, obs.cov = obs.cov)
-save(obs.list,file=paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda.obs.',site,'.Rdata'))
+save(obs.list,file=paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda.obs.',site,'.plots34.Rdata'))
 
 ################################################################################
 ################################################################################
