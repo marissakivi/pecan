@@ -20,7 +20,10 @@ For more information about this file see also [Keep a Changelog](http://keepacha
 - When building sipnet model would not set correct model version
 
 ### Changed
-- PEcAn.priors: renamed functions that looked like S3 methods but were not: `plot.posterior.density`->`plot_posterior.density`, `plot.prior.density`->`plot_prior.density`, `plot.trait`->`plot_trait` (#2439).
+- Rebuilt documentation using Roxygen 7. Readers get nicer formatting of usage sections, writers get more flexible behavior when inheriting parameters and less hassle when maintaining namespaces (#2524).
+- Renamed functions that looked like S3 methods but were not:
+    * PEcAn.priors: `plot.posterior.density`->`plot_posterior.density`, `plot.prior.density`->`plot_prior.density`, `plot.trait`->`plot_trait` (#2439).
+    * PEcAn.visualization: `plot.netcdf`->`plot_netcdf` (#2526).
 - Stricter package checking: `make check` and CI builds will now fail if `R CMD check` returns any ERRORs or any "newly-added" WARNINGs or NOTEs. "Newly-added" is determined by strict string comparison against a check result saved 2019-09-03; messages that exist in the reference result do not break the build but will be fixed as time allows in future refactorings (#2404).
 - No longer writing an arbitrary num for each PFT, this was breaking ED runs potentially.
 - The pecan/data container has no longer hardcoded path for postgres
@@ -31,6 +34,7 @@ For more information about this file see also [Keep a Changelog](http://keepacha
 - PEcAn.priors now exports functions `priorfig` and `plot_densities` (#2439).
 - Models monitoring container for Docker now shows a webpage with models it has seen
 - Added small container to check if certain services are up, used as initi container for kubernetes
+- Documentation how to run ED using singularity
 
 ## [1.7.1] - 2018-09-12
 

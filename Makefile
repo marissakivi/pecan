@@ -81,11 +81,12 @@ $(subst .doc/models/template,,$(MODELS_D)): .install/models/template
 
 include Makefile.depends
 
-SETROPTIONS = "options(Ncpus = ${NCPUS}, repos = 'http://cran.rstudio.com')"
+SETROPTIONS = "options(Ncpus = ${NCPUS}, repos = 'https://cran.rstudio.com')"
 
 clean:
 	rm -rf .install .check .test .doc
 	find modules/rtm/src \( -name \*.mod -o -name \*.o -o -name \*.so \) -delete
+	find models/basgra/src \( -name \*.mod -o -name \*.o -o -name \*.so \) -delete
 
 .install/devtools: | .install
 	+ ./scripts/time.sh "${1}" Rscript -e ${SETROPTIONS} -e "if(!requireNamespace('devtools', quietly = TRUE)) install.packages('devtools')"

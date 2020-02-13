@@ -93,7 +93,7 @@ left.pad.zeros <- function(num, digits = 5) {
 ##' @param y numeric vector
 ##' @return numeric vector with all values less than 0 set to 0
 ##' @export
-##' @author <unknown>
+##' @author unknown
 zero.truncate <- function(y) {
   y[y < 0 | is.na(y)] <- 0
   return(y)
@@ -651,10 +651,7 @@ convert.expr <- function(expression) {
 ##' @examples
 ##' \dontrun{
 ##' download.file("http://lib.stat.cmu.edu/datasets/csb/ch11b.txt","~/test.download.txt")
-##' }
 ##'
-##' @examples
-##' \dontrun{
 ##' download.file("
 ##'   ftp://ftp.cdc.noaa.gov/Datasets/NARR/monolevel/pres.sfc.2000.nc",
 ##'   "~/pres.sfc.2000.nc")
