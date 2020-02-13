@@ -15,10 +15,10 @@
 
 # set up working environment
 library(plyr)
+library(dplyr)
 library(PEcAn.settings)
 library(PEcAn.DB)
 library(PEcAn.data.land)
-library(dplyr)
 library(ggplot2)
 
 rm(list=ls())

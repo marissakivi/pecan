@@ -27,7 +27,7 @@ rm(list=ls())
 library(dplyr)
 library(PEcAn.DB)
 
-all.priors <- read.csv('~/data_files/priors_jan2020.csv', header = T)
+all.priors <- read.csv('~/data_files/priors-01-2020.csv', header = T)
 pfts <- as.vector(unique(all.priors$pft))
 if (pfts[length(pfts)]=='') pfts = pfts[1:(length(pfts)-1)]
 bety <- list(user = 'bety',
@@ -98,6 +98,7 @@ for (pft in pft_names){
     varid = vars.id %>% filter(name == varname) %>% dplyr::select(id)
     pftid = pftid
     
+    # get current value
     query.priors <- paste(
       "SELECT variables.name, pfts_priors.prior_id, parama, paramb, distn", 
       "FROM priors",
@@ -112,12 +113,30 @@ for (pft in pft_names){
     # prior in database already?
     add = TRUE
     
+    # if there is more than one prior, remove one
+    # if one is actually correct, we will find it again later
+    while (length(existing.prior$name) > 1){
+      print('there is more than one prior for this PFT and variable combination, removing all of them')
+      db.query(paste0("DELETE from pfts_priors WHERE prior_id = ",existing.prior$prior_id[1]), dbcon)
+      
+      # re-query
+      query.priors <- paste(
+        "SELECT variables.name, pfts_priors.prior_id, parama, paramb, distn", 
+        "FROM priors",
+        "JOIN variables ON priors.variable_id = variables.id",
+        "JOIN pfts_priors ON pfts_priors.prior_id = priors.id",
+        "JOIN pfts ON pfts.id = pfts_priors.pft_id",
+        "WHERE pfts.id =", pftid,
+        'AND priors.variable_id =', varid) 
+      priorid <- db.query(query = query.priors, con = dbcon)
+      existing.prior <- priorid
+    }
+    
     # check to see if existing priors is the same as what we need
     if (length(existing.prior$name) > 0){
-      
-      print('existing.prior is good')
-      if (existing.prior$parama == parama & existing.prior$paramb == paramb | existing.prior$distn == distn){
+      if (existing.prior$parama == parama & existing.prior$paramb == paramb & existing.prior$distn == distn){
         add = FALSE
+        print('existing.prior is good')
       }
     }
     
@@ -158,14 +177,21 @@ for (pft in pft_names){
       }else{ # we need to input a new prior 
         
         print('no prior available - need to insert new')
+        
+        # remove all associations with pft for this variable if it has some
+        if (length(existing.prior) > 0){
+          # update database query
+          db.query(paste0("DELETE from pfts_priors WHERE prior_id = ",existing.prior$prior_id), dbcon)
+        }
+        
         # input database query (first into priors table)
         now <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
         db.query(paste0("INSERT INTO priors ",
                         "(variable_id, phylogeny, distn, parama, paramb, notes, created_at, updated_at)",
                         " VALUES (",varid, ", '', '", distn, "', ", parama, ", ", paramb, ", '", pftres$name, 
                         " linkages', '", now, "', '", now, "')"), dbcon)
-        new.prior.id = db.query(paste0("SELECT id FROM priors where variable_id = ",varid, "AND notes = '", 
-                                       pftres$name, " linkages'"), dbcon)
+        new.prior.id = db.query(paste0("SELECT id FROM priors where variable_id = ",varid, " AND distn = '", 
+                                       distn,"' AND parama = ", parama, " AND paramb = ", paramb), dbcon)
         
         # (then into pfts_priors)
         db.query(paste0("INSERT INTO pfts_priors ",

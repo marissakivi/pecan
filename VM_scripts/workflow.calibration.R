@@ -17,19 +17,37 @@ library(igraph)
 library(RColorBrewer)
 library(PEcAn.all)
 
-workflowID = '14000000057'
+workflowID = '14000000077'
 setwd(paste0('/data/workflows/PEcAn_',workflowID))
 
+plot.dir = paste0('/data/workflows/PEcAn_',workflowID,'/calibration')
+if (!dir.exists(plot.dir)) dir.create(plot.dir)
+
+# HARVARD
 #sppname = c('red maple', 'yellow birch','american beech','red oak','eastern hemlock') #HARVARD
 #sppcol = c('purple','gold','blue','red','darkgreen') #HARVARD
 
-sppname = c('red maple','red spruce','white pine','red oak') #ROOSTER
-sppcol = c('purple','pink','green','red') #ROOSTER
+# ROOSTER
+#sppname = c('red maple','red spruce','white pine','red oak') #ROOSTER
+#sppcol = c('purple','pink','green','red') #ROOSTER
+
+# GOOSE
+#sppname = c('red maple', 'american beech', 'white pine','white oak', 'red oak')
+#sppcol = c('purple', 'blue', 'green', 'black', 'red')
+
+# NORTHROUND 1 & 2
+#sppname = c('sugar maple','yellow birch', 'american beech','white ash','eastern hemlock')
+#sppcol = c('magenta','gold','blue','brown','darkgreen')
+
+# NORTHROUND 3 & 4 
+sppname = c('red maple','white pine','red oak','eastern hemlock')
+sppcol = c('purple','green','red','darkgreen')
 
 settings = read.settings('pecan.CONFIGS.xml')
 nens = as.numeric(settings$ensemble$size)
+n = nens
 nspec = length(settings$pfts)
-nyear = 100
+nyear = 200
 runs = list.dirs('./out', full.names = FALSE)[-1]
 
 # IV. Visual check
@@ -66,9 +84,10 @@ bins.melt = tree.melt %>%
          species = as.factor(species))
 
 # 1. diameter plots
-tree.melt %>% mutate(species = as.factor(species)) %>%
+pl1 = tree.melt %>% mutate(species = as.factor(species)) %>%
+  filter(species %in% c(4,3,2)) %>%
   ggplot(aes(x = year, y = dbh, col = species)) +
-  geom_point() +
+  geom_point(size = 0.1) +
   facet_wrap(~ensemble) +
   labs(title='Diameter vs. Year') +
   scale_color_manual(
@@ -79,8 +98,10 @@ tree.melt %>% mutate(species = as.factor(species)) %>%
   ) +
   geom_hline(yintercept=10)
 
+ggsave(plot = pl1, file.path(plot.dir,'diameter.plot.jpg'))
+
 # 2. diameter bins plots
-bins.melt %>% ggplot(aes(x = year, y = dbh, col = species, size = num)) +
+pl2 = bins.melt %>% ggplot(aes(x = year, y = dbh, col = species, size = num)) +
   geom_point() +
   facet_wrap(~ensemble) +
   scale_size_continuous(
@@ -93,6 +114,8 @@ bins.melt %>% ggplot(aes(x = year, y = dbh, col = species, size = num)) +
     labels = sppname
   ) +
   geom_hline(yintercept=10)
+
+ggsave(plot = pl2, file.path(plot.dir,'diameter.bins.plot.jpg'))
 
 # 3. circle plots
 
@@ -122,17 +145,20 @@ vertices <- data.frame(id = ids, species=spp.ids, size=dbh.ids)
 hData <- graph_from_data_frame(edges, directed = TRUE, vertices = vertices)
 
 # create plot with hierarchical data
-pl <- ggraph(hData, layout = 'circlepack', weight="size") +
+pl3 <- ggraph(hData, layout = 'circlepack', weight="size") +
   geom_node_circle(aes(fill=species)) +
   scale_fill_manual(
     values = sppcol,
-    limits = c(1,2,3,4,5),
+    limits = c(1:nspec),
     name = 'species',
     labels = sppname
     ) +
   ggtitle(paste0('Stand Structure Plot in Year ',j)) +
   theme_void()
-pl
+ggsave(plot = pl3, file.path(plot.dir,'circle.plot.jpg'))
+
+# print maximum diameter reached by each species 
+tree.melt %>% group_by(species) %>% summarize(maxdia = max(dbh)) 
 
 # V. Investigate model output for weird behaviors
 
@@ -157,7 +183,7 @@ birth.melt %>%
   facet_wrap(~ensemble) +
   scale_color_manual(
     values = sppcol,
-    limits = c(1,2,3,4,5),
+    limits = c(1:nspec),
     name = 'species',
     labels = sppname
   )
@@ -194,7 +220,7 @@ birth.limit.melt = birth.melt %>%
   filter(births < 1,
          gmult != 3)
 birth.limit.melt$species = as.factor(birth.limit.melt$species)
-birth.limit.melt$species = plyr::mapvalues(birth.limit.melt$species, from = c(1,2,3,4,5), to = sppname)
+birth.limit.melt$species = plyr::mapvalues(birth.limit.melt$species, from = c(1:nspec), to = sppname)
 birth.limit.melt$gmult = as.factor(birth.limit.melt$gmult)
 birth.limit.melt$gmult = plyr::mapvalues(birth.limit.melt$gmult,
                                    from = c(1,2,4),
@@ -217,7 +243,7 @@ limit.melt %>%
   geom_histogram(binwidth = 1) +
   scale_fill_manual(
     values = sppcol,
-    limits = c(1,2,3,4,5),
+    limits = c(1:nspec),
     name = 'species',
     labels = sppname
   )
@@ -256,7 +282,7 @@ nogro.melt %>%
   facet_wrap(~ensemble) +
   scale_color_manual(
     values = sppcol,
-    limits = c(1,2,3,4,5),
+    limits = c(1:nspec),
     name = 'species',
     labels = sppname
   )
@@ -300,15 +326,34 @@ gf.melt = reshape::melt(gf.array)
 colnames(gf.melt) = c('tree','gf','year','ensemble','value')
 tree.melt = reshape::melt(tree.array)
 colnames(tree.melt) = c('tree','year','ensemble','species')
-lgf.melt = left_join(gf.melt,tree.melt) %>%
+lgf.melt = left_join(gf.melt,tree.melt) %>% 
   filter(!is.na(value)) %>%
   group_by(ensemble,year,tree,species) %>%
   summarize(lgf = ifelse(any(is.na(value)),NA,which.min(value)),
             lgf.val = ifelse(any(is.na(value)),NA,min(value)))
+
+# check to make sure smgf=0 is not degdgf=0 
+# in LINKAGES, if degdgf=0, than smgf and sngf= 0, too 
+zeros.id = which(lgf.melt$lgf.val==0)
+
+for (i in zeros.id){
+  
+  ens = lgf.melt$ensemble[i]
+  yr = lgf.melt$year[i]
+  tr = lgf.melt$tree[i]
+  
+  entry = gf.melt %>% filter(tree == tr, ensemble == ens, year == yr)
+  
+  # check if degdgf is zero, too
+  if (entry %>% filter(gf==4) %>% dplyr::select(value) == 0){
+    lgf.melt$lgf[i] = 4
+  }
+}
+
 lgf.melt$lgf = as.factor(lgf.melt$lgf)
 lgf.melt$species = as.factor(lgf.melt$species)
 
-# plot
+# this plot shows the lowest growth factor name and value for each species each year of the enesmblse 
 lgf.melt %>% ggplot(aes(x=year, y=lgf.val, col=lgf)) +
   geom_point() +
   geom_jitter() +
@@ -340,7 +385,7 @@ death.melt %>%
   facet_wrap(~ensemble) +
   scale_color_manual(
     values = sppcol,
-    limits = c(1,2,3,4,5),
+    limits = c(1:nspec),
     name = 'species',
     labels = sppname
   )
