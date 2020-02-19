@@ -4,8 +4,7 @@
 #'
 #' @param X A list of dataframes
 #' @description This function performs a simple outlier replacement on all the columns of dataframes inside a list
-#' @return A list the same dimension as X, with each column of each dataframe
-#'   modified by replacing outlier points with the column median
+#' @return
 #' @export
 #'
 outlier.detector.boxplot<-function(X) {

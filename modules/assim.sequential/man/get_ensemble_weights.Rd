@@ -4,12 +4,10 @@
 \alias{get_ensemble_weights}
 \title{get_ensemble_weights}
 \usage{
-get_ensemble_weights(settings, time_do)
+get_ensemble_weights(settings)
 }
 \arguments{
 \item{settings}{PEcAn settings object}
-
-\item{time_do}{Give user specific time so you don't have to have it be annual}
 }
 \value{
 NONE

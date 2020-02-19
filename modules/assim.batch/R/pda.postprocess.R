@@ -1,19 +1,13 @@
 ##' Postprocessing for PDA Results
 ##'
 ##' @title Postprocessing for PDA Results
-##' @param settings PEcAn settings list
-##' @param con DB connection
-##' @param mcmc.param.list output of PDA MCMC
-##' @param pname parameter names
-##' @param prior prior list
-##' @param prior.ind indices of targeted parameters
-##' @param sffx suffix to the output files, e.g. "hierarchical"
+##' @param all params are the identically named variables in pda.mcmc / pda.emulator
 ##'
 ##' @return PEcAn settings list, updated with <params.id> pointing to the new params file.
 ##'
 ##' @author Ryan Kelly, Istem Fer
 ##' @export
-pda.postprocess <- function(settings, con, mcmc.param.list, pname, prior, prior.ind, sffx = NULL) {
+pda.postprocess <- function(settings, con, mcmc.param.list, pname, prior, prior.ind) {
   
   # prepare for non-model params
   if(length(mcmc.param.list) > length(settings$pfts)){  
@@ -34,7 +28,7 @@ pda.postprocess <- function(settings, con, mcmc.param.list, pname, prior, prior.
     par.file.name <- NULL
   }
 
-  params.subset <- pda.plot.params(settings, mcmc.param.list, prior.ind, par.file.name, sffx)
+  params.subset <- pda.plot.params(settings, mcmc.param.list, prior.ind, par.file.name)
   
   for (i in seq_along(settings$pfts)) {
     
@@ -44,44 +38,37 @@ pda.postprocess <- function(settings, con, mcmc.param.list, pname, prior, prior.
                                       settings$pfts[[i]]$name, 
                                       "_", 
                                       settings$assim.batch$ensemble.id, 
-                                      sffx, ".Rdata"))
+                                      ".Rdata"))
 
     params.pft <- params.subset[[i]]
     save(params.pft, file = filename.mcmc)
     
-    if(!is.null(con)){
-      ## create a new Posteriors DB entry
-      pft.id <- PEcAn.DB::db.query(paste0("SELECT pfts.id FROM pfts, modeltypes WHERE pfts.name='",
-                                          settings$pfts[[i]]$name, 
-                                          "' and pfts.modeltype_id=modeltypes.id and modeltypes.name='", 
-                                          settings$model$type, "'"), 
-                                   con)[["id"]]
-      
-      
-      posteriorid <-  PEcAn.DB::db.query(paste0("INSERT INTO posteriors (pft_id) VALUES (",
-                                                pft.id, ") RETURNING id"), con)
-      
-      
-      PEcAn.logger::logger.info(paste0("--- Posteriorid for ", settings$pfts[[i]]$name, " is ", posteriorid, " ---"))
-      settings$pfts[[i]]$posteriorid <- posteriorid
-    }
+
+    ## create a new Posteriors DB entry
+    pft.id <- PEcAn.DB::db.query(paste0("SELECT pfts.id FROM pfts, modeltypes WHERE pfts.name='",
+                              settings$pfts[[i]]$name, 
+                              "' and pfts.modeltype_id=modeltypes.id and modeltypes.name='", 
+                              settings$model$type, "'"), 
+                         con)[["id"]]
+
+
+    posteriorid <-  PEcAn.DB::db.query(paste0("INSERT INTO posteriors (pft_id) VALUES (",
+                    pft.id, ") RETURNING id"), con)
+    
+    
+    PEcAn.logger::logger.info(paste0("--- Posteriorid for ", settings$pfts[[i]]$name, " is ", posteriorid, " ---"))
+    settings$pfts[[i]]$posteriorid <- posteriorid
     
     ## save named distributions
     ## *** TODO: Generalize for multiple PFTS
     post.distns <- PEcAn.MA::approx.posterior(trait.mcmc = params.subset[[i]], 
                                     priors = prior[[i]], 
                                     outdir = settings$pfts[[i]]$outdir, 
-                                    filename.flag = paste0(".pda.", settings$pfts[[i]]$name, "_", 
-                                                           settings$assim.batch$ensemble.id, sffx))
+                                    filename.flag = paste0(".pda.", settings$pfts[[i]]$name, "_", settings$assim.batch$ensemble.id))
     filename <- file.path(settings$pfts[[i]]$outdir, 
-                          paste0("post.distns.pda.", settings$pfts[[i]]$name, "_", 
-                                 settings$assim.batch$ensemble.id, sffx, ".Rdata"))
+                          paste0("post.distns.pda.", settings$pfts[[i]]$name, "_", settings$assim.batch$ensemble.id, ".Rdata"))
     save(post.distns, file = filename)
-    
-    if(!is.null(con)){
-      PEcAn.DB::dbfile.insert(dirname(filename), basename(filename), "Posterior", posteriorid, con)
-    }
-
+    PEcAn.DB::dbfile.insert(dirname(filename), basename(filename), "Posterior", posteriorid, con)
     
     # Symlink to post.distns.Rdata (no ensemble.id identifier)
     if (file.exists(file.path(dirname(filename), "post.distns.Rdata"))) {
@@ -110,20 +97,16 @@ pda.postprocess <- function(settings, con, mcmc.param.list, pname, prior, prior.
                           paste0("trait.mcmc.pda.", 
                                  settings$pfts[[i]]$name, 
                                  "_", settings$assim.batch$ensemble.id, 
-                                 sffx, ".Rdata"))
+                                 ".Rdata"))
     save(trait.mcmc, file = filename)
-    
-    if(!is.null(con)){
-      PEcAn.DB::dbfile.insert(dirname(filename), basename(filename), "Posterior", posteriorid, con)
-    }
-    
+    PEcAn.DB::dbfile.insert(dirname(filename), basename(filename), "Posterior", posteriorid, con)
   }  #end of loop over PFTs
   
   ## save updated settings XML
   XML::saveXML(
     PEcAn.settings::listToXml(settings, "pecan"),
     file = file.path(
-      dirname(settings$modeloutdir),
+      settings$outdir,
       paste0("pecan.pda", settings$assim.batch$ensemble.id, ".xml")))
 
   return(settings)
@@ -133,17 +116,13 @@ pda.postprocess <- function(settings, con, mcmc.param.list, pname, prior, prior.
 ##' Plot PDA Parameter Diagnostics
 ##'
 ##' @title Plot PDA Parameter Diagnostics
-##' @param settings PEcAn settings list
-##' @param mcmc.param.list MCMC param list to be sorted
-##' @param prior.ind indices of the targeted parameters
-##' @param par.file.name output file name
-##' @param sffx suffix to the output file names
+##' @param all params are the identically named variables in pda.mcmc / pda.emulator
 ##'
 ##' @return Nothing. Plot is generated and saved to PDF.
 ##'
 ##' @author Ryan Kelly, Istem Fer
 ##' @export
-pda.plot.params <- function(settings, mcmc.param.list, prior.ind, par.file.name = NULL, sffx) {
+pda.plot.params <- function(settings, mcmc.param.list, prior.ind, par.file.name = NULL) {
   
   params.subset <- list()
   
@@ -151,7 +130,7 @@ pda.plot.params <- function(settings, mcmc.param.list, prior.ind, par.file.name 
   enough.iter <- TRUE
   
   for (i in seq_along(prior.ind)) {
-    params.subset[[i]] <- coda::as.mcmc.list(lapply(mcmc.param.list[[i]], coda::mcmc))
+    params.subset[[i]] <- coda::as.mcmc.list(lapply(mcmc.param.list[[i]], mcmc))
     
     burnin <- getBurnin(params.subset[[i]], method = "gelman.plot")
     
@@ -174,12 +153,12 @@ pda.plot.params <- function(settings, mcmc.param.list, prior.ind, par.file.name 
                     paste0("mcmc.diagnostics.pda.",
                            settings$pfts[[i]]$name,
                            "_", settings$assim.batch$ensemble.id,
-                           sffx, ".pdf")))
+                           ".pdf")))
     } else {
       grDevices::pdf(file.path(par.file.name,
                     paste0("mcmc.diagnostics.pda.par_",
                            settings$assim.batch$ensemble.id,
-                           sffx, ".pdf")))
+                           ".pdf")))
     }
 
     graphics::layout(matrix(c(1, 2, 3, 4, 5, 6), ncol = 2, byrow = TRUE))
@@ -205,11 +184,11 @@ pda.plot.params <- function(settings, mcmc.param.list, prior.ind, par.file.name 
                                       paste0("mcmc.diagnostics.pda.", 
                                              settings$pfts[[i]]$name, "_", 
                                              settings$assim.batch$ensemble.id, 
-                                             sffx, ".txt"))
+                                             ".txt"))
     } else {
       filename.mcmc.temp <- file.path(par.file.name, 
                                       paste0("mcmc.diagnostics.pda.par_", 
-                                             settings$assim.batch$ensemble.id, sffx, ".txt"))
+                                             settings$assim.batch$ensemble.id,".txt"))
     }
 
     
@@ -249,13 +228,10 @@ pda.plot.params <- function(settings, mcmc.param.list, prior.ind, par.file.name 
 
 
 ##' Function to write posterior distributions of the scaling factors
-##' @param sf.samp.list scaling factor MCMC samples
-##' @param sf.prior scaling factor prior 
-##' @param sf.samp.filename scaling factor posterior output file name
 ##' @export
 write_sf_posterior <- function(sf.samp.list, sf.prior, sf.samp.filename){
   
-  sf.samp <- coda::as.mcmc.list(lapply(sf.samp.list, coda::mcmc))
+  sf.samp <- coda::as.mcmc.list(lapply(sf.samp.list, mcmc))
   
   # saving this before discarding burnin, because in resampling we want to keep the samples together
   save(sf.samp, file = sf.samp.filename)
@@ -278,81 +254,3 @@ write_sf_posterior <- function(sf.samp.list, sf.prior, sf.samp.filename){
   return(sf.post.distns)
   
 } # write_sf_posterior
-
-
-##' Function to sort Hierarchical MCMC samples
-##' @param mcmc.out MCMC samples
-##' @param sub.sample which subsample to return
-##' @param ns site number
-##' @param prior.all prior dataframe
-##' @param prior.ind.all.ns indices of targeted parameters on the prior.all dataframe
-##' @param sf scaling factor if used
-##' @param n.param.orig original indices of parameters on the prior.list
-##' @param prior.list list of prior dataframes
-##' @param prior.fn.all prior functions
-##' @export
-pda.sort.params <- function(mcmc.out, sub.sample = "mu_global_samp", ns = NULL, prior.all, prior.ind.all.ns, 
-                            sf = NULL, n.param.orig, prior.list, prior.fn.all){
-  
-  mcmc.samp.list <- list()
-  
-  for (c in seq_along(mcmc.out)) {
-    
-    m <- matrix(NA, nrow =  nrow(mcmc.out[[c]][[sub.sample]]), ncol = length(prior.ind.all.ns))
-    
-    # TODO: make this sf compatible for multi site
-    if(!is.null(sf)){
-      sfm <- matrix(NA, nrow =  nrow(mcmc.out[[c]][[sub.sample]]), ncol = length(sf))
-    }
-    
-    # TODO: get back to this when scaling factor is used
-    # # retrieve rownames separately to get rid of var_name* structures
-    prior.all.rownames <- unlist(sapply(prior.list, rownames))
-    
-    sc <- 1
-    for (i in seq_along(prior.ind.all.ns)) {
-      sf.check <- prior.all.rownames[prior.ind.all.ns][i]
-      idx <- grep(sf.check, rownames(prior.all)[prior.ind.all.ns]) ## it used to be prior.ind.all, check if this was a typo
-      if(any(grepl(sf.check, sf))){
-        
-        m[, i] <- eval(prior.fn.all$qprior[prior.ind.all.ns][[i]],
-                       list(p = mcmc.out[[c]][[sub.sample]][, idx]))
-        
-        
-        if(sc <= length(sf)){
-          sfm[, sc] <- mcmc.out[[c]][[sub.sample]][, idx]
-          sc <- sc + 1
-        }
-        
-      }else{
-        
-        if(is.null(ns)){
-          m[, i] <- mcmc.out[[c]][[sub.sample]][, idx]
-        }else{
-          m[, i] <- mcmc.out[[c]][[sub.sample]][, idx, ns]
-        }
-        
-
-      }
-    }
-    
-    colnames(m) <- prior.all.rownames[prior.ind.all.ns]
-    mcmc.samp.list[[c]] <- m
-    
-    if(!is.null(sf)){
-      colnames(sfm) <- paste0(sf, "_SF")
-      sf.samp.list[[c]] <- sfm
-    }
-    
-  }
-  
-  # Separate each PFT's parameter samples (and bias term) to their own list
-  mcmc.param.list <- list()
-  ind <- 0
-  for (i in seq_along(n.param.orig)) {
-    mcmc.param.list[[i]] <- lapply(mcmc.samp.list, function(x) x[, (ind + 1):(ind + n.param.orig[i]), drop = FALSE])
-    ind <- ind + n.param.orig[i]
-  }
-  
-  return(mcmc.param.list)
-} # pda.sort.params

@@ -4,57 +4,19 @@
 \alias{mcmc.GP}
 \title{mcmc.GP}
 \usage{
-mcmc.GP(
-  gp,
-  x0,
-  nmcmc,
-  rng,
-  format = "lin",
-  mix = "joint",
-  splinefcns = NULL,
-  jmp0 = 0.35 * (rng[, 2] - rng[, 1]),
-  ar.target = 0.5,
-  priors = NA,
-  settings,
-  run.block = TRUE,
-  n.of.obs,
-  llik.fn,
-  hyper.pars,
-  resume.list = NULL
-)
+mcmc.GP(gp, x0, nmcmc, rng, format = "lin", mix = "joint",
+  splinefcns = NULL, jmp0 = 0.35 * (rng[, 2] - rng[, 1]),
+  ar.target = 0.5, priors = NA, settings, run.block = TRUE, n.of.obs,
+  llik.fn, hyper.pars, resume.list = NULL)
 }
 \arguments{
-\item{gp}{Gaussian Process}
-
-\item{x0}{initial values}
-
-\item{nmcmc}{number of iterations}
-
-\item{rng}{range of knots}
+\item{x0}{}
 
 \item{format}{lin = lnlike fcn, log = log(lnlike)}
 
 \item{mix}{each = jump each dim. independently, joint = jump all at once}
 
-\item{splinefcns}{spline functions, not used}
-
-\item{jmp0}{initial jump variances}
-
-\item{ar.target}{acceptance rate target}
-
-\item{priors}{prior list}
-
-\item{settings}{PEcAn settings list}
-
-\item{run.block}{is this a new run or making the previous chain longer}
-
-\item{n.of.obs}{number of observations}
-
-\item{llik.fn}{list that contains likelihood functions}
-
-\item{hyper.pars}{hyper parameters}
-
-\item{resume.list}{list of needed info if we are running the chain longer}
+\item{priors}{}
 }
 \description{
 Function to sample from a GP model

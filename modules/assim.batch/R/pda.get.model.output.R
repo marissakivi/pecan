@@ -1,18 +1,14 @@
 ##' Get Model Output for PDA
 ##'
 ##' @title Get Model Output for PDA
-##' @param settings PEcAn settings list
-##' @param run.id run ID
-##' @param bety bety list
-##' @param inputs inputs list
-##' @param external.formats format list
+##' @param all params are the identically named variables in pda.mcmc / pda.emulator
 ##'
 ##' @return A list containing model outputs extracted to correspond to each observational
 ##'         dataset being used for PDA. 
 ##'
 ##' @author Ryan Kelly, Istem Fer
 ##' @export
-pda.get.model.output <- function(settings, run.id, bety, inputs, external.formats = NULL) {
+pda.get.model.output <- function(settings, run.id, bety, inputs) {
   
   input.info <- settings$assim.batch$inputs
   
@@ -34,13 +30,10 @@ pda.get.model.output <- function(settings, run.id, bety, inputs, external.format
     # if no derivation is requested expr will be the same as variable name
     expr <- lapply(variable.name, `[[`, "expression")
     
-    if(is.null(bety$con)){
-      format <- external.formats[[k]]
-    }else{
-      format <- PEcAn.DB::query.format.vars(bety = bety,
-                                            input.id = settings$assim.batch$inputs[[k]]$input.id)
-    }
+    format <- PEcAn.DB::query.format.vars(bety = bety,
+                                input.id = settings$assim.batch$inputs[[k]]$input.id)
 
+    
     for(l in seq_along(model.var)){
       
       if(length(model.var[[l]][model.var[[l]] %in% format$vars$bety_name]) != 0){

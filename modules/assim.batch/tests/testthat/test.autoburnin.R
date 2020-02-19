@@ -1,6 +1,5 @@
 library(PEcAn.assim.batch)
 library(testthat)
-
 context("Autoburnin functions")
 
 # Generate some simple data for testing convergence check

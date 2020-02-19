@@ -31,8 +31,8 @@ query.data <- function(
               ids_are_cultivars = FALSE,
               ...) {
   id_type <- if (ids_are_cultivars) {"cultivar_id"} else {"specie_id"}
- 
- query <- paste("select
+
+  query <- paste("select
               traits.id, traits.citation_id, traits.site_id, traits.treatment_id,
               treatments.name, traits.date, traits.time, traits.cultivar_id, traits.specie_id,
               traits.mean, traits.statname, traits.stat, traits.n, variables.name as vname,

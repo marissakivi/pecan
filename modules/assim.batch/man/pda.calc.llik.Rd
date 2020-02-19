@@ -7,11 +7,7 @@
 pda.calc.llik(pda.errors, llik.fn, llik.par)
 }
 \arguments{
-\item{pda.errors}{calculated errors}
-
-\item{llik.fn}{list of likelihood fcns}
-
-\item{llik.par}{parameters to be passed llik functions}
+\item{all}{params are the identically named variables in pda.mcmc / pda.emulator}
 }
 \value{
 Total log likelihood (i.e., sum of log likelihoods for each dataset)

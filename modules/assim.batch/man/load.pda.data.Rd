@@ -7,16 +7,12 @@
 \usage{
 load.L2Ameriflux.cf(file.in)
 
-load.pda.data(settings, bety, external.formats = NULL)
+load.pda.data(settings, bety)
 }
 \arguments{
 \item{file.in}{= the netcdf file of L2 data}
 
 \item{settings}{= PEcAn settings list}
-
-\item{bety}{bety list object}
-
-\item{external.formats}{formats list}
 }
 \value{
 A data frame of all variables in the netcdf

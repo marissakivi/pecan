@@ -243,7 +243,7 @@ extract_soil_gssurgo<-function(outdir, lat, lon, size=1, radius=500, depths=c(0.
 #' @param lat 
 #' @param lon 
 #'
-#' @return path to netCDF file containing extracted data
+#' @return
 #' @export
 #'
 #' @examples
@@ -343,7 +343,7 @@ extract_soil_nc <- function(in.file,outdir,lat,lon){
 #'
 #' @param varname 
 #'
-#' @return character
+#' @return
 #' @export
 #'
 #' @examples

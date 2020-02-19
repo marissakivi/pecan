@@ -7,11 +7,7 @@
 pda.create.ensemble(settings, con, workflow.id)
 }
 \arguments{
-\item{settings}{a PEcAn settings list}
-
-\item{con}{DB connection}
-
-\item{workflow.id}{workflow ID}
+\item{all}{params are the identically named variables in pda.mcmc / pda.emulator}
 }
 \value{
 Ensemble ID of the created ensemble

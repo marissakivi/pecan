@@ -232,9 +232,7 @@ soil_params <- function(soil_type=NULL, sand=NULL, silt=NULL, clay=NULL, bulk=NU
 #' @param sandfrac 
 #' @param clayfrac 
 #'
-#' @return vector of integers identifying textural class of each input layer.
-#'  Possible values are 1 through 17; NB these are NOT the same class
-#'  boundaries as the 12 USDA soil texture classes.
+#' @return
 #' @export
 #'
 #' @examples
@@ -310,7 +308,7 @@ sclass <- function(sandfrac,clayfrac){
 #' @param mpot   water potential
 #' @param mysoil soil property list
 #'
-#' @return volumetric soil water content
+#' @return
 #' @export
 #'
 #' @examples

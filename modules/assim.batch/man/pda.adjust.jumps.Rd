@@ -7,13 +7,7 @@
 pda.adjust.jumps(settings, jmp.list, accept.rate, pnames = NULL)
 }
 \arguments{
-\item{settings}{a PEcAn settings list}
-
-\item{jmp.list}{list of jump variances}
-
-\item{accept.rate}{acceptance rate}
-
-\item{pnames}{parameter names}
+\item{all}{params are the identically named variables in pda.mcmc / pda.emulator}
 }
 \value{
 A PEcAn settings list updated to reflect adjusted jump distributions

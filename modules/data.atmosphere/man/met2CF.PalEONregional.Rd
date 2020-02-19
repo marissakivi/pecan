@@ -4,18 +4,25 @@
 \alias{met2CF.PalEONregional}
 \title{met2CF.PalEONregional}
 \usage{
-met2CF.PalEONregional(
-  in.path,
-  in.prefix,
-  outfolder,
-  start_date,
-  end_date,
-  overwrite = FALSE,
-  verbose = FALSE,
-  ...
-)
+met2CF.PalEONregional(in.path, in.prefix, outfolder, start_date, end_date,
+  overwrite = FALSE, verbose = FALSE, ...)
+
+met2CF.PalEONregional(in.path, in.prefix, outfolder, start_date, end_date,
+  overwrite = FALSE, verbose = FALSE, ...)
 }
 \arguments{
+\item{in.path}{location on disk where inputs are stored}
+
+\item{in.prefix}{prefix of input and output files}
+
+\item{outfolder}{location on disk where outputs will be stored}
+
+\item{start_date}{the start date of the data to be downloaded (will only use the year part of the date)}
+
+\item{end_date}{the end date of the data to be downloaded (will only use the year part of the date)}
+
+\item{overwrite}{should existing files be overwritten}
+
 \item{in.path}{location on disk where inputs are stored}
 
 \item{in.prefix}{prefix of input and output files}
@@ -30,7 +37,11 @@ met2CF.PalEONregional(
 }
 \description{
 Get meteorology variables from PalEON netCDF files and convert to netCDF CF format
+
+Get meteorology variables from PalEON netCDF files and convert to netCDF CF format
 }
 \author{
+Mike Dietze
+
 Mike Dietze
 }

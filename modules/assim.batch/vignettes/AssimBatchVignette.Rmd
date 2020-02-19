@@ -4,11 +4,7 @@ author:
 - "Ryan Kelly"
 - "Istem Fer"
 date: "July 12, 2015 (Updated on 08/08/16)"
-output: html_vignette
-vignette: >
-  %\VignetteIndexEntry{PEcAn.assim.batch Vignette}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+output: html_document
 ---
 
 ## Install package from Github

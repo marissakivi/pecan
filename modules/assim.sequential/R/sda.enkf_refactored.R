@@ -424,18 +424,11 @@ sda.enkf <- function(settings,
         X.new<-enkf.params[[t-1]]$X.new
       }
       
-      if(!exists('Cmcmc_tobit2space')) {
-        recompileTobit = TRUE
+      if(!exists('Cmcmc_tobit2space') | !exists('Cmcmc')) {
+        recompile = TRUE
       }else{
-        recompileTobit = FALSE
+        recompile = FALSE
       }
-      
-      if(!exists('Cmcmc')) {
-        recompileGEF = TRUE
-      }else{
-        recompileGEF = FALSE
-      }
-      
       
       
       wts <- unlist(weight_list[[t]][outconfig$samples$met$ids])
@@ -447,8 +440,7 @@ sda.enkf <- function(settings,
                                        Observed=list(R=R, Y=Y),
                                        H=H,
                                        extraArg=list(aqq=aqq, bqq=bqq, t=t,
-                                                     recompileTobit=recompileTobit,
-                                                     recompileGEF=recompileGEF,
+                                                     recompile=recompile,
                                                      wts = wts),
                                        nt=nt,
                                        obs.mean=obs.mean,
@@ -564,11 +556,11 @@ sda.enkf <- function(settings,
   ### time series plots                                                 ###
   ###-------------------------------------------------------------------###----- 
   if(control$TimeseriesPlot) post.analysis.ggplot(settings,t,obs.times,obs.mean,obs.cov,obs,X,FORECAST,ANALYSIS,plot.title=control$plot.title)
-  if(control$TimeseriesPlot) PEcAn.assim.sequential::post.analysis.ggplot.violin(settings, t, obs.times, obs.mean, obs.cov, obs, X, FORECAST, ANALYSIS)
+  if(control$TimeseriesPlot) PEcAn.assim.sequential:::post.analysis.ggplot.violin(settings, t, obs.times, obs.mean, obs.cov, obs, X, FORECAST, ANALYSIS)
   ###-------------------------------------------------------------------###
   ### bias diagnostics                                                  ###
   ###-------------------------------------------------------------------###----
-  if(control$BiasPlot)   PEcAn.assim.sequential::postana.bias.plotting.sda(settings,t,obs.times,obs.mean,obs.cov,obs,X,FORECAST,ANALYSIS)
+  if(control$BiasPlot)   PEcAn.assim.sequential:::postana.bias.plotting.sda(settings,t,obs.times,obs.mean,obs.cov,obs,X,FORECAST,ANALYSIS)
   ###-------------------------------------------------------------------###
   ### process variance plots                                            ###
   ###-------------------------------------------------------------------###----- 

@@ -7,13 +7,7 @@
 pda.adjust.jumps.bs(settings, jcov, accept.count, params.recent)
 }
 \arguments{
-\item{settings}{a PEcAn settings list}
-
-\item{jcov}{jump covariance matrix}
-
-\item{accept.count}{aceeptance count}
-
-\item{params.recent}{parameters accepted since previous adjustment}
+\item{all}{params are the identically named variables in pda.mcmc / pda.emulator}
 }
 \value{
 A PEcAn settings list updated to reflect adjusted jump distributions
