@@ -3,9 +3,7 @@
 #' @param x Vector defining CI center
 #' @param ylo Vector defining bottom of CI envelope
 #' @param yhi Vector defining top of CI envelope
-#' @param ... further arguments passed on to `graphics::polygon`
-#'
-#' @export
+#' @export 
 #' @author Michael Dietze, David LeBauer
 ciEnvelope <- function(x, ylo, yhi, ...) {
   m   <- rbind(x, ylo, yhi)
@@ -32,7 +30,6 @@ ciEnvelope <- function(x, ylo, yhi, ...) {
     x <- sub.m[[i]]["x", ]
     ylo <- sub.m[[i]]["ylo", ]
     yhi <- sub.m[[i]]["yhi", ]
-    graphics::polygon(
-      cbind(c(x, rev(x), x[1]), c(ylo, rev(yhi), ylo[1])), border = NA, ...)
+    polygon(cbind(c(x, rev(x), x[1]), c(ylo, rev(yhi), ylo[1])), border = NA, ...)
   }
 } # ciEnvelope
