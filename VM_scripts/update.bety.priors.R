@@ -1,35 +1,32 @@
-## Mass updates on BETY species parameter priors 
+## Mass updates on BETY species parameter priors for LINKAGES
 ## September 21 2019
 ## Marissa Kivi 
 
-# this script takes as input a settings file (for pft information) and an updated prior matrix, where
-# the matrix features are pft name, variable name, and distribution name (ALL GIVEN IN PECAN FORMAT), as 
-# well as the parameters for the distribution - this function only works with two parameter distns right
-# now but could be adapted to include more 
+# This script takes a specially-formatted prior matrix as input (example given in shared Google drive).
+# The matrix features are pft name, variable name, and distribution name (ALL GIVEN IN PECAN FORMAT; see example), as 
+# well as the parameters for the distribution. Right now, this function only works with two-parameter distributions. 
 
-# script workflow: 
-# - load settings and open DB connection
-# FOR EACH PFT: 
-# - read in updated priors for pft 
-# FOR EACH UPDATED PRIOR: 
-# check if existing prior is good:
-#   if yes, go to next prior
-#   else, check if prior exists, but isn't associated:
-#       if yes, check if another prior is associated:
-#             if yes, dissociate it
-#             associate good prior with pft
-#       else, input a new prior and associate it 
+# The general workflow of the script is as follows: 
+# (1) Set up the working environment and open BETY connection
+# (2) Loop through the PFTs
+#     (A) Loop through priors
+#        (i) Check if the current prior for this species is OK. If yes, go to next prior. 
+#        (ii) Else, check if there is another prior in the database that would works. If yes, associate it with the PFT. 
+#        (iii) Else, create a new prior for our needs. 
 
 ###############################
-# set up working environment
+# 1. Set up working environment
 ###############################
 rm(list=ls())
 library(dplyr)
 library(PEcAn.DB)
 
+# load prior information
 all.priors <- read.csv('~/data_files/priors-01-2020.csv', header = T)
 pfts <- as.vector(unique(all.priors$pft))
 if (pfts[length(pfts)]=='') pfts = pfts[1:(length(pfts)-1)]
+
+# make bety connection
 bety <- list(user = 'bety',
              password = 'bety',
              host = 'postgres',
@@ -37,8 +34,6 @@ bety <- list(user = 'bety',
              driver = "PostgreSQL",
              write = TRUE)
 modeltype =  "1000000008" # linkages model 
-
-# make bety connection
 dbcon <- db.open(bety)
 on.exit(db.close(dbcon))
 
@@ -46,7 +41,7 @@ on.exit(db.close(dbcon))
 pars = c('DMAX','DMIN','HTMAX','AGEMX','DBHMAX','Gmax','SPRTND','SPRTMN','SPRTMX','MPLANT','D3',
          'FROST','CM1','CM2','CM3','CM4','CM5','FWT','SLTA','SLTB')
 
-# get variable ids for each desired parameter
+# get variable id numbers for each LINKAGES parameter
 query.text <- paste(
   "SELECT name, variables.id",
   "FROM variables") 
@@ -54,15 +49,11 @@ vars.id = db.query(query = query.text, con = dbcon) %>%
   filter(name %in% pars) 
 vars.id$id = sapply(vars.id$id, toString)
 
-#################################
-# check what is available in db
-#################################
+##################################
+# 2. Loop through the PFTs
+##################################
 
-# check pfts in database
-#if (!is.list(pfts)) {
-#  PEcAn.logger::logger.severe('pfts must be a list')
-#}
-#pft_names <- vapply(pfts, "[[", character(1), "name")
+# get pft id numbers for each pft in the matrix
 pft_names = pfts
 pft_ids <- sapply(query_pfts(dbcon, pft_names, strict = TRUE)[["id"]], toString)
 
@@ -80,17 +71,22 @@ for (pft in pft_names){
     break
   }
 
-  # read in updated priors
+  # read in updated priors for this pft 
   new.priors = all.priors %>% 
     filter(pft == pftres$name) %>%
     dplyr::select(pft, varname, distn, parama, paramb)
 
-  # adjust all priors in table if they are different
+########################################
+# 3. Loop through the priors for the PFT
+########################################
+  
+  # loop through the priors for this pft
   for (i in 1:length(new.priors$pft)){
     
     print(i)
     p = new.priors[i,]
     
+    # pick out updated prior information
     varname = p$varname # variable name not pft
     distn = p$distn
     parama = p$parama
@@ -98,7 +94,11 @@ for (pft in pft_names){
     varid = vars.id %>% filter(name == varname) %>% dplyr::select(id)
     pftid = pftid
     
-    # get current value
+##########################################################
+# 4. Is the current prior OK? (i.e. no changes necessary)
+##########################################################
+    
+    # get current prior associated with this pft in BETY
     query.priors <- paste(
       "SELECT variables.name, pfts_priors.prior_id, parama, paramb, distn", 
       "FROM priors",
@@ -140,11 +140,19 @@ for (pft in pft_names){
       }
     }
     
+##################################################
+# 5. Current prior is not OK; need a different one
+##################################################
+    
     # if add is still TRUE, we need a new prior because the old one doesn't line up
     if (add){
       
       print('need to add new prior')
       
+###################################################
+# 6. Is there a good prior already in the database?
+###################################################
+
       # let's see if there are any priors in the database that we can just associate with the pft
       query.priors <- paste0(
         "SELECT variables.name, priors.id, parama, paramb, distn ", 
@@ -173,6 +181,10 @@ for (pft in pft_names){
         db.query(paste0("INSERT into pfts_priors ",
                         "(pft_id, prior_id, created_at, updated_at)",
                         " VALUES (", pftid, ", ",  poss_prior$id, ", '", now, "', '", now, "')"), dbcon)
+        
+######################################
+# 7. Need to add an entirely new prior
+######################################
         
       }else{ # we need to input a new prior 
         

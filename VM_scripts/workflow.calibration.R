@@ -6,7 +6,6 @@
 # script => update_bety_priors.R
 
 # II. Run dry run on PEcAn interface
-
 rm(list=ls())
 
 # III. Set run-specific variables
