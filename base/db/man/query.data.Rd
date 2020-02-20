@@ -4,16 +4,10 @@
 \alias{query.data}
 \title{Query data and transform stats to SE by calling \code{\link{fetch.stats2se}};}
 \usage{
-query.data(
-  trait,
-  spstr,
-  con,
+query.data(trait, spstr, con,
   extra.columns = paste("ST_X(ST_CENTROID(sites.geometry)) AS lon,",
-    "ST_Y(ST_CENTROID(sites.geometry)) AS lat, "),
-  store.unconverted = FALSE,
-  ids_are_cultivars = FALSE,
-  ...
-)
+  "ST_Y(ST_CENTROID(sites.geometry)) AS lat, "),
+  store.unconverted = FALSE, ids_are_cultivars = FALSE, ...)
 }
 \arguments{
 \item{trait}{trait to query from the database}
