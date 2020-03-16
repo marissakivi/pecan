@@ -25,7 +25,7 @@ library(ggplot2)
 rm(list=ls())
 
 ### ADJUST VARIABLES HERE
-site = 'HARVARD'
+site = 'NORTHROUND'
 
 # input RDS data file location and name
 input = readRDS(paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/NPP_STAT_MODEL_',site,'.RDS'))
@@ -34,7 +34,7 @@ input = readRDS(paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/NPP
 plot.loc = paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda_priority_spp_plot12.jpg')
 
 # final data product save location
-output = paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda.obs.',site,'.plots34.Rdata')
+output = paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda.obs.',site,'.plots12.Rdata')
 ###
 
 # Before anything else, let's remove all NA values in order to reduce variable size.
@@ -61,7 +61,7 @@ input = input %>% filter(type == 'ab') %>% select(-type)
 ########### 3. Which models are available for the site? ###########
 # First, look at the number of models used. If more than one, which model do you want to use?
 levels(input$model)
-model.pick = 'Model RW + Census'
+model.pick = 'Model RW'
 # Then, reduce the input data to be just that model.
 input = input %>% filter(model == model.pick) %>% select(-model)
 
@@ -75,7 +75,7 @@ names(input)
 names(input)[3] = 'plot'
 # Choose which plots you want to include. 
 unique(input$plot)
-plts = c(1,2,3,4)
+plts = c(1,2)
 input <- input %>% filter(plot %in% plts) %>% select(-plot)
 
 ################################################################################
@@ -135,7 +135,8 @@ pl
 
 # looking at the plot, record in the following vector the codes of the species whose points fall
 # under the red line 
-species = c('QURU','ACRU','FAGR','BEAL','TSCA')
+#species = c('QURU','ACRU','FAGR','BEAL','TSCA') # HF 
+species = c('FAGR','FRAM','BEAL','ACSA','TSCA')
 
 # save plot
 ggsave(pl, filename = plot.loc)
@@ -165,11 +166,12 @@ unique(melt.next$taxon)
 # name for each of your species IN THE SAME ORDER AS THE SPECIES VECTOR ABOVE. 
 
 species # for order 
-x = c('Quercus.Rubra_Northern.Red.Oak.2',
-      'Acer.Rubrum_Red.Maple.2',
-      'Fagus.Grandifolia_American.Beech.2',
+x = c('Fagus.Grandifolia_American.Beech.2',
+      'Fraxinus.Americana_White.Ash.2',
       'Betula.Alleghaniensis_Yellow.Birch.2',
+      'Acer.Saccharum_Sugar.Maple.2',
       'Tsuga.Canadensis_Hemlock.2')
+x = paste0(var.names, '.',x)
 names(x) = species
 x
 
