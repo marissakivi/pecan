@@ -58,7 +58,7 @@ options(error=quote({
 }))
 
 # set working directory to workflow folder from spinup 
-workflowID = '14000000047'
+workflowID = '14000000092'
 setwd(paste0('/data/workflows/PEcAn_',workflowID))
 
 # --------------------------------------------------
@@ -73,8 +73,10 @@ setwd(paste0('/data/workflows/PEcAn_',workflowID))
 ### A. Go to the Terminal tab. 
 ### B. Paste the following commands in order, running each one separately. Pay attention to where you should be 
 ###    adjusting text for your own personal run. 
-    # cd /data/workflows/PEcAn_<insert model ID> 
-    # sudo chmod g+rw -R .
+    # pwd ---> here we are checking that we are in the correct directory (should be the workflow in question)
+    # su carya ---> this makes sure that any superuser permissions you gave carya are in effect 
+    # ---> type illinoiss for password
+    # sudo chmod g+rw -R . ---> don't forget the period at the end here
     # ---> type illinois for password 
 ### C. Return to the Console tab. 
 
@@ -88,9 +90,9 @@ setwd(paste0('/data/workflows/PEcAn_',workflowID))
 # them in the /data folder in a previous step. We also need to know how many ensembles you are running. Adjust the 
 # variables below.
 
-ensemble_location = '/data/dbfiles/met_data/HARVARD/weights/ensemble-weights-HARVARD-prism.csv'
-metdir <- '/data/dbfiles/met_data/HARVARD/linkages/'
-n = 15
+ensemble_location = '/data/dbfiles/met_data/NORTHROUND/weights/ensemble-weights-NRP-prism.csv'
+metdir <- '/data/dbfiles/met_data/NORTHROUND/linkages/'
+n = 200
 
 ### A. Get our sampled list of met ensembles. 
 
@@ -102,6 +104,14 @@ avg_wt <- ens_wts$wts
 # randomly select n models from list of climate models based on their weights
 # ANN: do we want to allow replacement here? do we just want to take the n most highly weighted ensembles?
 clim_use <- sample(x = clim_mods, size = n, prob = avg_wt, replace = T)
+
+# need to save wts so we can use it in SDA workflow 
+wts_use <- vector()
+for (i in 1:n) wts_use[i] = avg_wt[which(clim_mods == clim_use[i])]
+
+# reweight so sum = 1 
+wts_use_1 = wts_use / sum(wts_use)
+save(ens_wts = wts_use_1, file = './weights.Rdata')
 
 # write the text to be added to the XML file; tabs have been added automatically so that the paste looks nicer
 name <- numeric(length(clim_use))

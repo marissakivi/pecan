@@ -159,12 +159,12 @@ services:
   # ----------------------------------------------------------------------
   # RStudio
   # ----------------------------------------------------------------------
-  rstudio-nginx:
-    image: pecan/rstudio-nginx:${PECAN_VERSION:-develop}
-    networks:
-      - pecan
-    ports: 
-      - 80:80
+  #rstudio-nginx:
+  #  image: pecan/rstudio-nginx:${PECAN_VERSION:-develop}
+  #  networks:
+  #    - pecan
+  #  ports: 
+  #    - 80:80
         #labels:
             #- "traefik.enable=true"
             #- "traefik.backend=rstudio"
@@ -181,12 +181,46 @@ services:
     environment:
       - USER=${PECAN_RSTUDIO_USER:-carya}
       - PASSWORD=${PECAN_RSTUDIO_PASS:-illinois}
+      - ROOT=TRUE
     entrypoint: /init
-    expose: 
-      - "8787"
+    ports: 
+      - "1000:8787"
     volumes:
       - pecan:/data
       - ./:/home/carya
+
+        #rstudio2: 
+        # image: pecan/base:${PECAN_VERSION:-develop}
+        #restart: unless-stopped
+        #networks:
+        # - pecan
+        #environment:
+        #- USER=${PECAN_RSTUDIO_USER:-quercus}
+        #- PASSWORD=${PECAN_RSTUDIO_PASS:-rubra}
+        # - ROOT=TRUE
+        #entrypoint: /init
+        #ports:
+        #- "2000:8787"
+        #volumes:
+        #- pecan:/data
+        #- ./:/home/carya
+
+  rstudio3: 
+    image: pecan/base:${PECAN_VERSION:-develop}
+    restart: unless-stopped
+    networks:
+      - pecan
+    environment:
+      - USER=${PECAN_RSTUDIO_USER:-acer}
+      - PASSWORD=${PECAN_RSTUDIO_PASS:-rubrum}
+      - ROOT=TRUE
+    entrypoint: /init
+    ports:
+      - "3000:8787"
+    volumes:
+      - pecan:/data
+      - ./:/home/acer 
+
 
   # ----------------------------------------------------------------------
   # PEcAn application

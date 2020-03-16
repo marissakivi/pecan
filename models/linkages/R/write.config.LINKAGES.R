@@ -96,8 +96,6 @@ write.config.LINKAGES <- function(defaults = NULL, trait.values, settings, run.i
   clat <- read.csv(system.file("clat.csv", package = "linkages"), header = FALSE)
   load('/data/dbfiles/switch.mat.Rdata')
   
-  PEcAn.logger::logger.info(paste('The dimensions of switch.mat are:', dim(switch.mat)))
-  
   if(!is.null(inputs)){
     climate_file <- inputs$met$path
     load(climate_file)
@@ -113,7 +111,6 @@ write.config.LINKAGES <- function(defaults = NULL, trait.values, settings, run.i
   basesn <- 1.64
   
   spp.params.default <- read.csv("/data/dbfiles/spp_matrix.csv")  # default spp.params
-  PEcAn.logger::logger.info(paste('The dimensions of spp_matrix.csv are:', dim(spp.params.default)))
   
   nspec <- length(settings$pfts)
   spp.params.save <- numeric(nspec)

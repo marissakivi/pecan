@@ -2,8 +2,7 @@
 ## RUNNING SDA FOR ENSEMBLE-MET SDA MODEL RUNS
 
 ## Marissa Kivi 
-## 12 September 2019
-
+## Last updated: 23 Feb 2020
 # ---------------------
 # 0. Complete spin-up
 # ---------------------
@@ -21,18 +20,17 @@ rm(list=ls())
 
 # For this step, you will need the workflow ID from your spin-up. Adjust the variable below accordingly.  
 
-ID = '14000000037'
+ID = '14000000092'
 
 # load necessary libraries
 library(dplyr)
 library(dbplyr)
 library(PEcAn.settings)
 library(PEcAn.uncertainty)
-library(PEcAn.SIPNET)
 library(PEcAn.LINKAGES)
 library(PEcAn.visualization)
-library(PEcAn.ED2)
 library(PEcAn.assim.sequential)
+library(PEcAn.DB)
 library(PEcAn.remote)
 library(nimble)
 library(lubridate)
@@ -40,6 +38,11 @@ library(PEcAn.visualization)
 library(rgdal) # need to put in assim.sequential
 library(ncdf4) # need to put in assim.sequential
 
+# source the assim.sequential functions that we will need 
+source('~/VM_scripts/assim.sequential.2/get_ensemble_weights.R')
+source('~/VM_scripts/assim.sequential.2/assess.params.R')
+source('~/VM_scripts/assim.sequential.2/Nimble_codes.R')
+source('~/VM_scripts/assim.sequential.2/Analysis_sda.R')
 
 # set working directory to workflow info
 setwd(paste0('/data/workflows/PEcAn_',ID))
@@ -56,42 +59,42 @@ setwd(paste0('/data/workflows/PEcAn_',ID))
 ###    Comment/Uncomment Lines. Adjust the script as noted in the comments on the right side. Be sure to erase all of the 
 ###    comments!! 
 
-  # <state.data.assimilation>
-  #   <overwrite>TRUE</overwrite>
-  #   <n.ensemble>30</n.ensemble>   # this needs to be changed to the correct number of ensembles members from spin-up
-  #   <adjustment>TRUE</adjustment>
-  #   <process.variance>FALSE</process.variance> # this should be TRUE!
-  #   <sample.parameters>TRUE</sample.parameters>
-  #   <inputs>
-  #     <file>
-  #       <input.id></input.id>  # we will load this input data later
-  #       <path>
-  #         <path></path>
-  #       </path>
-  #       <operator>direct</operator>
-  #       <variable.id>1000000132</variable.id>  # if you are assimilating anything besides PFT aboveground biomass, change here
-  #       <variable.name>
-  #         <variable.name>AGB.pft</variable.name>
-  #       </variable.name>
-  #     </file>
-  #   </inputs>
-  #   <state.variables>
-  #     <variable>
-  #       <variable.name>AGB.pft</variable.name>  # ""
-  #       <variable.id>1000000132</variable.id>  # ""
-  #       <unit>MgC/ha/yr</unit>  # ""
-  #       <min_value>0</min_value>   # the min and max values set the range for what is appropriate for state variable values
-  #       <max_value>100000000</max_value>  # ""
-  #     </variable>
-  #   </state.variables>
-  #   <spin.up>
-  #     <start.date>1860/01/01</start.date>  # these dates should be the same as the start and end date of your spin-up (scroll down under <run>)
-  #     <end.date>1960/12/31</end.date>
-  #   </spin.up>
-  #   <forecast.time.step>year</forecast.time.step>  # this setting controls how often the workflow is assimilating data
-  #   <start.date>1960/01/01</start.date>  # first year of SDA - has to be the same year as last year of spin-up
-  #   <end.date>2010/12/31</end.date> # last year of SDA
-  # </state.data.assimilation>
+  <state.data.assimilation>
+    <overwrite>TRUE</overwrite>
+    <n.ensemble>30</n.ensemble>   # this needs to be changed to the correct number of ensembles members from spin-up
+    <adjustment>TRUE</adjustment>
+    <process.variance>TRUE</process.variance>
+    <sample.parameters>TRUE</sample.parameters>
+    <inputs>
+      <file>
+        <input.id></input.id>  # we will load this input data later
+        <path>
+          <path></path>
+        </path>
+        <operator>direct</operator>
+        <variable.id>1000000132</variable.id>  # if you are assimilating anything besides PFT aboveground biomass, change here
+        <variable.name>
+          <variable.name>AGB.pft</variable.name>
+        </variable.name>
+        <min_value>0</min_value>   # the min and max values set the range for what is appropriate for state variable values
+        <max_value>100000000</max_value>  # ""
+      </file>
+    </inputs>
+    <state.variables>
+      <variable>
+        <variable.name>AGB.pft</variable.name>  # ""
+        <variable.id>1000000132</variable.id>  # ""
+        <unit>MgC/ha/yr</unit>  # ""
+      </variable>
+    </state.variables>
+    <spin.up>
+      <start.date>1860/01/01</start.date>  # these dates should be the same as the start and end date of your spin-up (scroll down under <run>)
+      <end.date>1960/12/31</end.date>
+    </spin.up>
+    <forecast.time.step>year</forecast.time.step>  # this setting controls how often the workflow is assimilating data
+    <start.date>1960/01/01</start.date>  # first year of SDA - has to be the same year as last year of spin-up
+    <end.date>2010/12/31</end.date> # last year of SDA
+  </state.data.assimilation>
         
 ### D. Save and close the file. 
 
@@ -103,15 +106,9 @@ setwd(paste0('/data/workflows/PEcAn_',ID))
 # to be assimilated into the model. 
 
 # load transformed and reformatted observation data 
-load('/data/dbfiles/sda.obs.Rdata')
+load('/data/dbfiles/sda.obs.NORTHROUND.plots12.Rdata')
 obs.mean <- obs.list$obs.mean
 obs.cov <- obs.list$obs.cov
-
-for (i in 1:length(names(obs.mean))){
-  this = names(obs.mean)[i]
-  names(obs.mean)[i] = paste0(substr(this,1,4),'-',substr(this,6,7),'-',substr(this,9,10))
-  names(obs.cov)[i] = paste0(substr(this,1,4),'-',substr(this,6,7),'-',substr(this,9,10))
-}
 
 # load SDA xml as settings file
 settings <- read.settings("pecan.SDA.xml")
@@ -132,7 +129,7 @@ settings <- read.settings("pecan.SDA.xml")
 IC = NULL
 Q = NULL
 adjustment = TRUE
-restart=F
+restart = NULL
 control=list(trace=T,
              interactivePlot=T,
              TimeseriesPlot=T,
@@ -188,6 +185,9 @@ if (!is.null(restart)) {
   Start.Year <-(lubridate::year(settings$state.data.assimilation$start.date))
 }
 End.Year <-   lubridate::year(settings$state.data.assimilation$end.date) # years that assimilations will be done for - obs will be subsetted based on this
+
+# hack to get the years correct
+restart = FALSE
 
 # filtering obs data based on years specifited in setting > state.data.assimilation
 assimyears<-Start.Year:End.Year
@@ -272,8 +272,8 @@ FORECAST    <- ANALYSIS <- list()
 enkf.params <- list()
 
 # shape parameters estimated over time for process covariance
-aqq         <- NULL
-bqq         <- numeric(nt + 1)
+aqq         <- list()
+bqq         <- list()
 
 # track range of state variables 
 # interval remade everytime depending on data at time t
@@ -285,14 +285,17 @@ rownames(state.interval) <- var.names
 
 # parameters for ensembles should be created in main PEcAn workflow 
 # set ensemble weights - either by Rdata file or sets all to constant 1 
-if(!file.exists(file.path(settings$outdir, "ensemble_weights.Rdata"))){
+if(!file.exists("weights.Rdata")){
   PEcAn.logger::logger.warn("ensemble_weights.Rdata cannot be found. Make sure you generate samples by running the get.ensemble.weights function before running SDA if you want the ensembles to be weighted.")
   #create null list
   for(tt in 1:length(obs.times)){
     weight_list[[tt]] <- rep(1,nens) #no weights
   }
 } else{
-  load(file.path(settings$outdir, "ensemble_weights.Rdata"))  ## loads ensemble.samples
+  load('weights.Rdata')  ## loads ensemble.samples
+  for (tt in 1:length(obs.times)){
+    weight_list[[tt]] <- wts_use_1
+  }
 }
 
 # check for and load ensemble sample data
@@ -480,7 +483,7 @@ for(t in t:nt){
   
   # the following chunk will print all of the state variable forecasts for each of the ensembles
 
-  Sys.sleep(60)
+  Sys.sleep(540) # the input is sleep time in seconds
   
   X_tmp <- vector("list", 2)
   X <- list()
@@ -518,6 +521,10 @@ for(t in t:nt){
   
   # set up variables for analysis
   X <- do.call(rbind, X)
+  
+  FORECAST[[t]] <- X
+  mu.f <- colMeans(X)
+  Pf <- cov(X)
   
   # check to make sure there are successful forecasts 
   if(sum(X,na.rm=T) == 0){
@@ -579,10 +586,17 @@ for(t in t:nt){
       bqq <- enkf.params[[t-1]]$bqq
       X.new<-enkf.params[[t-1]]$X.new
     }
-    if(!exists('Cmcmc_tobit2space') | !exists('Cmcmc')) {
-      recompile = TRUE
+    
+    if(!exists('Cmcmc_tobit2space')) {
+      recompileTobit = TRUE
     }else{
-      recompile = FALSE
+      recompileTobit = FALSE
+    }
+    
+    if(!exists('Cmcmc')) {
+      recompileGEF = TRUE
+    }else{
+      recompileGEF = FALSE
     }
     
     # get weights 
@@ -595,14 +609,15 @@ for(t in t:nt){
                                      Observed=list(R=R, Y=Y),
                                      H=H,
                                      extraArg=list(aqq=aqq, bqq=bqq, t=t,
-                                                   recompile=recompile,
+                                                   recompileTobit=recompileTobit,
+                                                   recompileGEF=recompileGEF,
                                                    wts = wts),
                                      nt=nt,
                                      obs.mean=obs.mean,
                                      obs.cov=obs.cov)
     
     # reading back analysis state variable variables for forecast . . 
-    FORECAST[[t]] <- X
+    #FORECAST[[t]] <- X
     mu.f <- enkf.params[[t]]$mu.f
     Pf <- enkf.params[[t]]$Pf
     # and analysis
@@ -710,9 +725,9 @@ for(t in t:nt){
        ensemble.id, ensemble.samples, inputs, Viz.output,  file = file.path(settings$outdir,"SDA", "sda.output.Rdata"))
   
   # interactive plotting 
-  if (t > 1 & control$interactivePlot) { #
-    print(interactive.plotting.sda(settings,t,obs.times,obs.mean,obs.cov,obs,X,FORECAST,ANALYSIS))
-  }
+  #if (t > 1 & control$interactivePlot) { #
+  #  print(interactive.plotting.sda(settings,t,obs.times,obs.mean,obs.cov,obs,X,FORECAST,ANALYSIS))
+  #}
 } 
 # end loop over time
  

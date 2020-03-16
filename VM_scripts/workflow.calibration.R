@@ -16,7 +16,7 @@ library(igraph)
 library(RColorBrewer)
 library(PEcAn.all)
 
-workflowID = '14000000077'
+workflowID = '14000000085'
 setwd(paste0('/data/workflows/PEcAn_',workflowID))
 
 plot.dir = paste0('/data/workflows/PEcAn_',workflowID,'/calibration')
@@ -39,14 +39,14 @@ if (!dir.exists(plot.dir)) dir.create(plot.dir)
 #sppcol = c('magenta','gold','blue','brown','darkgreen')
 
 # NORTHROUND 3 & 4 
-sppname = c('red maple','white pine','red oak','eastern hemlock')
-sppcol = c('purple','green','red','darkgreen')
+#sppname = c('red maple','white pine','red oak','eastern hemlock')
+#sppcol = c('purple','green','red','darkgreen')
 
 settings = read.settings('pecan.CONFIGS.xml')
 nens = as.numeric(settings$ensemble$size)
 n = nens
 nspec = length(settings$pfts)
-nyear = 200
+nyear = 100
 runs = list.dirs('./out', full.names = FALSE)[-1]
 
 # IV. Visual check
