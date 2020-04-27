@@ -23,7 +23,7 @@ library(class)
 library(GGally)
 library(randomForest)
 
-source('~/VM_scripts/gather_sda_data.R')
+source('~/VM_scripts/gather.sda.data.R')
 ```
 
 # Step 1: Prepare data
@@ -42,12 +42,12 @@ source('~/VM_scripts/gather_sda_data.R')
 #GE.data = gather_sda_data()
 
 # Site 2: Harvard Forest
-workflowID = '14000000018'
+workflowID = '14000000080'
 settings.HF = read.settings(paste0('/data/workflows/PEcAn_',workflowID,'/pecan.SDA.xml'))
 lat = 42.53
 lon = -72.18
 spp.HF = as.vector(sapply(settings.HF$pfts, function(pft){pft$name}))
-load(paste0('/data/dbfiles/sda.obs.Rdata'))
+load(paste0('/data/dbfiles/sda.obs.HARVARD.RData'))
 #load(paste0('/data/dbfiles/sda.obs.HF.Rdata'))
 obs.list.HF = obs.list
 site = 'HF'
@@ -64,17 +64,17 @@ HF.data = gather_sda_data(settings = settings.HF, lat, lon, obs.list=obs.list.HF
 #NRP.data = gather_sda_data()
 
 # Site 4: Rooster Hill
-workflowID = '14000000036'
-settings.RH = read.settings(paste0('/data/workflows/PEcAn_',workflowID,'/pecan.SDA.xml'))
-lat = 43.2309
-lon = -74.5267
-spp.RH = as.vector(sapply(settings.RH$pfts, function(pft){pft$name}))
-load(paste0('/data/dbfiles/sda.obs.RH.Rdata'))
-obs.mean = obs.list$obs.mean[as.numeric(substr(names(obs.list$obs.mean),1,4)) %in% c(1960:2010)]
-obs.cov = obs.list$obs.cov[as.numeric(substr(names(obs.list$obs.cov),1,4)) %in% c(1960:2010)]
-obs.list.RH = list(obs.mean = obs.mean, obs.cov = obs.cov)
-site = 'RH'
-RH.data = gather_sda_data(settings = settings.RH, lat, lon, obs.list=obs.list.RH, init=site)
+#workflowID = '14000000036'
+#settings.RH = read.settings(paste0('/data/workflows/PEcAn_',workflowID,'/pecan.SDA.xml'))
+# lat = 43.2309
+# lon = -74.5267
+# spp.RH = as.vector(sapply(settings.RH$pfts, function(pft){pft$name}))
+# load(paste0('/data/dbfiles/sda.obs.RH.Rdata'))
+# obs.mean = obs.list$obs.mean[as.numeric(substr(names(obs.list$obs.mean),1,4)) %in% c(1960:2010)]
+# obs.cov = obs.list$obs.cov[as.numeric(substr(names(obs.list$obs.cov),1,4)) %in% c(1960:2010)]
+# obs.list.RH = list(obs.mean = obs.mean, obs.cov = obs.cov)
+# site = 'RH'
+# RH.data = gather_sda_data(settings = settings.RH, lat, lon, obs.list=obs.list.RH, init=site)
 
 ```
 
@@ -86,16 +86,23 @@ Group data from all sites into a few variables.
 # Compile data 
 
 #data = list(GE.data, HF.data, NRP.data, RH.data)
-data = list(HF.data, RH.data)
+#data = list(HF.data, RH.data)
+data = list(HF.data)
 
 # Step 2 and 3 
 #param.melt = rbind(GE.data$param.melt, HF.data$param.melt, NRP.data$param.melt, RH.data$param.melt)
 #bias.melt = rbind(GE.data$bias.melt, HF.data$bias.melt, NRP.data$bias.melt, RH.data$bias.melt) %>% mutate(class = (bias <= abs(0.25)))
-param.melt = rbind(HF.data$param.melt, RH.data$param.melt)
-bias.melt = rbind(HF.data$bias.melt, RH.data$bias.melt) %>% mutate(class = (bias <= abs(0.25)))
+#param.melt = rbind(HF.data$param.melt, RH.data$param.melt)
+#bias.melt = rbind(HF.data$bias.melt, RH.data$bias.melt) %>% mutate(class = (bias <= abs(0.25)))
+
+#param.melt = rbind(HF.data$param.melt, RH.data$param.melt)
+#bias.melt = rbind(HF.data$bias.melt, RH.data$bias.melt) %>% mutate(class = (bias <= abs(0.25)))
+
+param.melt = rbind(HF.data$param.melt)
+bias.melt = rbind(HF.data$bias.melt) %>% mutate(class = (bias <= abs(0.075)))
 
 good.ensembles = c(bias.melt %>% group_by(ensemble) %>% 
-  summarize(class = ifelse(mean(abs(bias)) <= 0.25,1,0)) %>%
+  summarize(class = ifelse(mean(abs(bias)) <= 0.075,1,0)) %>%
   filter(class == 1) %>%
   dplyr::select(ensemble))
 
@@ -103,8 +110,10 @@ sites = unique(param.melt$site)
 
 #all.spp = unique(c(spp.GE, spp.HF, spp.NRP, spp.RH))
 #spp.list = list(spp.GE = spp.GE, spp.HF = spp.HF, spp.NRP = spp.NRP, spp.RH = spp.RH)
-all.spp = unique(c(spp.HF, spp.RH))
-spp.list = list(spp.HF = spp.HF, spp.RH = spp.RH)
+#all.spp = unique(c(spp.HF, spp.RH))
+#spp.list = list(spp.HF = spp.HF, spp.RH = spp.RH)
+all.spp = unique(c(spp.HF))
+spp.list = list(spp.HF = spp.HF)
 
 run.list = list()
 for (s in all.spp){
@@ -156,7 +165,7 @@ print(barplot(vi.df$imp, main = 'Importance Rankings of Spp Parameters'))
 
 ### ADJUST SCRIPT HERE 
 # cut off variables at elbow seen in above bar plot
-vi.df.red = vi.df %>% filter(imp>=0.6) 
+vi.df.red = vi.df %>% filter(imp>=0.3) 
 
 # save objects
 obj1 = list()
@@ -249,7 +258,7 @@ print(barplot(vi.df2$imp))
 ```{R,message=FALSE, warnings=FALSE, echo = FALSE}
 
 # cut off variables at elbow seen in above bar plot
-vi.df.red2 = vi.df2 %>% filter(imp>=0.8) 
+vi.df.red2 = vi.df2 %>% filter(imp>=0.25) 
 
 # save objects
 last = nvars
@@ -457,7 +466,7 @@ Variables are considered significant subject to a significance level of 1%.
 
 ```{R, echo = FALSE, messages = FALSE, warnings = FALSE}
 ## ADJUST SPECIES HERE
-sp = 1
+sp = 3
 spec = all.spp[sp]
 
 # gather data
@@ -580,8 +589,9 @@ for (sp in 1:length(all.spp)){
 
 ```{R, echo = FALSE, warnings = FALSE}
 # loop through species 
-for (sp in 1:length(all.spp)){
-  
+#for (sp in 1:length(all.spp)){
+for (sp in 1:3){
+
   # check to make sure there are predictors
   if (is.na(obj4[[sp]])) next
   
@@ -675,7 +685,7 @@ for (sp in 1:length(all.spp)){
   
   # gather data of variables for species
   data6 = run.list[[sp]]
-  data6$class = ifelse(data6$bias<=0.25, 1, 0)
+  data6$class = ifelse(data6$bias<=0.15, 1, 0)
   if (length(unique(data6$dominant)) < 2){
     data6$dominant = as.factor(data6$dominant)
     data6 = data6 %>% dplyr::select(-ens, -year, -lat, -lon, -pred, -bias, -weight)
@@ -692,6 +702,7 @@ for (sp in 1:length(all.spp)){
   vi_sort3 = sort(vi_imp3, decreasing = TRUE, index.return=TRUE)
   vi.df3 = data.frame(par = rownames(vi_imp3)[vi_sort3$ix], imp = vi_sort3$x)
   plot = barplot(vi.df3$imp, main = sp)
+  plot
 }
 ```
 Consider barplot to determine how many variables we want to consider further. 
@@ -701,7 +712,7 @@ Consider barplot to determine how many variables we want to consider further.
 ```{R, message=FALSE, warnings=FALSE, echo = FALSE}
 
 # from the barplots above, determine how many variables we want to keep for each species
-cuts = c(1,1,1,NA,3,1)
+cuts = c(NA,1,NA,NA,NA)
 
 # plot variables found to be important
 for (sp in 1:length(all.spp)){
@@ -714,7 +725,7 @@ for (sp in 1:length(all.spp)){
   
   # gather data again
   data6 = run.list[[sp]]
-  data6$class = ifelse(data6$bias<=0.25, 1, 0)
+  data6$class = ifelse(data6$bias<=0.15, 1, 0)
   if (length(unique(data6$dominant)) < 2){
     data6$dominant = as.factor(data6$dominant)
     data6 = data6 %>% dplyr::select(-ens, -year, -lat, -lon, -pred, -bias, -weight)
