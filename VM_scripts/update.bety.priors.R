@@ -22,7 +22,7 @@ library(dplyr)
 library(PEcAn.DB)
 
 # load prior information
-all.priors <- read.csv('~/data_files/priors-01-2020.csv', header = T)
+all.priors <- read.csv('~/data_files/priors-04-2020.csv', header = T)
 pfts <- as.vector(unique(all.priors$pft))
 if (pfts[length(pfts)]=='') pfts = pfts[1:(length(pfts)-1)]
 
@@ -39,7 +39,7 @@ on.exit(db.close(dbcon))
 
 # variable names that are needed for LINKAGES species: 
 pars = c('DMAX','DMIN','HTMAX','AGEMX','DBHMAX','Gmax','SPRTND','SPRTMN','SPRTMX','MPLANT','D3',
-         'FROST','CM1','CM2','CM3','CM4','CM5','FWT','SLTA','SLTB')
+         'FROST','CM1','CM2','CM3','CM4','CM5','SLA','SLTA','SLTB')
 
 # get variable id numbers for each LINKAGES parameter
 query.text <- paste(
@@ -83,11 +83,11 @@ for (pft in pft_names){
   # loop through the priors for this pft
   for (i in 1:length(new.priors$pft)){
     
-    print(i)
     p = new.priors[i,]
     
     # pick out updated prior information
     varname = p$varname # variable name not pft
+    print(toString(varname))
     distn = p$distn
     parama = p$parama
     paramb = p$paramb

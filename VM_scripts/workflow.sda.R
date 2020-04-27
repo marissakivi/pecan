@@ -20,7 +20,7 @@ rm(list=ls())
 
 # For this step, you will need the workflow ID from your spin-up. Adjust the variable below accordingly.  
 
-ID = '14000000092'
+ID = '14000000098'
 
 # load necessary libraries
 library(dplyr)
@@ -39,10 +39,10 @@ library(rgdal) # need to put in assim.sequential
 library(ncdf4) # need to put in assim.sequential
 
 # source the assim.sequential functions that we will need 
-source('~/VM_scripts/assim.sequential.2/get_ensemble_weights.R')
-source('~/VM_scripts/assim.sequential.2/assess.params.R')
-source('~/VM_scripts/assim.sequential.2/Nimble_codes.R')
-source('~/VM_scripts/assim.sequential.2/Analysis_sda.R')
+source('/home/acer/VM_scripts/assim.sequential.2/get_ensemble_weights.R')
+source('/home/acer/VM_scripts/assim.sequential.2/assess.params.R')
+source('/home/acer/VM_scripts/assim.sequential.2/Nimble_codes.R')
+source('/home/acer/VM_scripts/assim.sequential.2/Analysis_sda.R')
 
 # set working directory to workflow info
 setwd(paste0('/data/workflows/PEcAn_',ID))
@@ -76,14 +76,14 @@ setwd(paste0('/data/workflows/PEcAn_',ID))
         <variable.name>
           <variable.name>AGB.pft</variable.name>
         </variable.name>
-        <min_value>0</min_value>   # the min and max values set the range for what is appropriate for state variable values
-        <max_value>100000000</max_value>  # ""
       </file>
     </inputs>
     <state.variables>
       <variable>
-        <variable.name>AGB.pft</variable.name>  # ""
+        <variable.name>AGB.pft</variable.name>  # the min and max values set the range for what is appropriate for state variable values
         <variable.id>1000000132</variable.id>  # ""
+        <min_value>0</min_value>   # ""
+        <max_value>100000000</max_value>  # ""
         <unit>MgC/ha/yr</unit>  # ""
       </variable>
     </state.variables>
@@ -106,7 +106,7 @@ setwd(paste0('/data/workflows/PEcAn_',ID))
 # to be assimilated into the model. 
 
 # load transformed and reformatted observation data 
-load('/data/dbfiles/sda.obs.NORTHROUND.plots12.Rdata')
+load('/data/dbfiles/sda.obs.HARVARD.Rdata')
 obs.mean <- obs.list$obs.mean
 obs.cov <- obs.list$obs.cov
 

@@ -41,7 +41,6 @@ library(PEcAn.LINKAGES)
 library(PEcAn.visualization)
 library(PEcAn.assim.sequential)
 library(PEcAn.remote)
-library(PEcAn.visualization)
 library(PEcAn.utils)
 library(PEcAn.DB)
 library(RCurl)
@@ -58,7 +57,7 @@ options(error=quote({
 }))
 
 # set working directory to workflow folder from spinup 
-workflowID = '14000000092'
+workflowID = '14000000098'
 setwd(paste0('/data/workflows/PEcAn_',workflowID))
 
 # --------------------------------------------------
@@ -90,7 +89,7 @@ setwd(paste0('/data/workflows/PEcAn_',workflowID))
 # them in the /data folder in a previous step. We also need to know how many ensembles you are running. Adjust the 
 # variables below.
 
-ensemble_location = '/data/dbfiles/met_data/NORTHROUND/weights/ensemble-weights-NRP-prism.csv'
+ensemble_location = '/data/dbfiles/met_data/HARVARD/weights/ensemble-weights-HARVARD-prism.csv'
 metdir <- '/data/dbfiles/met_data/NORTHROUND/linkages/'
 n = 200
 

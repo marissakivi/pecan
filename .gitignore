@@ -102,4 +102,5 @@ data_files/*
 rstudio/*
 .rstudio/*
 .bash_history
-workflows/
+workflows_save/
+amw/
