@@ -42,7 +42,7 @@ read_restart.LINKAGES <- function(outdir, runid, stop.time, settings, var.names 
   forecast <- list()
 
   if ("Fcomp" %in% var.names) {
-    forecast[[length(forecast)+1]] <- ens$AGB.pft #already has C  #* unit.conv 
+    forecast[[length(forecast)+1]] <- ens$Fcomp #already has C  #* unit.conv 
     names(forecast[[length(forecast)]]) <- paste0('Fcomp.',pft.names)
   }
   
