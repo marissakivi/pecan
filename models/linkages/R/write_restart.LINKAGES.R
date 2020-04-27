@@ -66,28 +66,7 @@ write_restart.LINKAGES <- function(outdir, runid, start.time, stop.time,
       distance.matrix[i,which(distance.matrix[i,]==0)] <- distance.matrix[i,i]
       distance.matrix[i,i] <- 0
     } 
-  }
-  #diag(distance.matrix) <- 0
-  
-  if(FALSE){
-    distance.matrix <- rbind(c(0, 1, 4, 3, 2, 6, 5, 8, 7, 9, 10, 11, 12, 13, 14), 
-                             c(5, 0, 3, 4, 8, 1, 2, 7, 6, 9, 10, 11, 12, 13, 14), 
-                             c(5, 3, 0, 1, 8, 4, 2, 7, 6, 9, 10, 11, 12, 13, 14), 
-                             c(6, 2, 1, 0, 8, 4, 3, 7, 5, 9, 10, 11, 12, 13, 14), 
-                             c(2, 7, 5, 4, 0, 8, 6, 1, 3, 9, 10, 11, 12, 13, 14), 
-                             c(6, 1, 3, 4, 8, 0, 2, 7, 5, 9, 10, 11, 12, 13, 14), 
-                             c(5, 3, 1, 2, 8, 6, 0, 7, 4, 9, 10, 11, 12, 13, 14), 
-                             c(3, 6, 4, 5, 1, 7, 8, 0, 2, 9, 10, 11, 12, 13, 14), 
-                             c(1, 5, 3, 2, 7, 6, 4, 8, 0, 9, 10, 11, 12, 13, 14), 
-                             c(3, 6, 4, 5, 1, 7, 8, 9, 2, 0, 10, 11, 12, 13, 14), 
-                             c(3, 6, 4, 5, 1, 7, 8, 10, 2, 9, 0, 11, 12, 13, 14), 
-                             c(3, 6, 4, 5, 1, 7, 8, 11, 2, 9, 10, 0, 12, 13, 14), 
-                             c(3, 6, 4, 5, 1, 7, 8, 12, 2, 9, 10, 11, 0, 13, 14), 
-                             c(3, 6, 4, 5, 1, 7, 8, 13, 2, 9, 10, 11, 12, 0, 14), 
-                             c(3, 6, 4, 5, 1, 7, 8, 14, 2, 9, 10, 11, 12, 13, 0))
-    
-  }
-  #distance.matrix <- rbind(c(0,3,1,2), c(3,0,2,1), c(1,2,0,3), c(2,1,3,0))
+
   
   ## HACK
   spp.params.default <- read.csv(system.file("spp_matrix.csv", package = "linkages"))  #default spp.params
@@ -136,6 +115,105 @@ write_restart.LINKAGES <- function(outdir, runid, start.time, stop.time,
     (b_obs - biomass_function(dbh, spp.biomass.params)) ^ 2
   } # merit
   
+  
+  ## distance matrix calculation :: identify ranking for cloning species by identifying which species are closer together in parameter space
+  # gather all species parameters into a dataframe 
+  all.params = spp.params.default 
+  
+  for (pft in spp.params.default$Spp_Name){
+      
+    # get information for specific PFT 
+    pft.ind = which(all.params$Spp_Name == pft)
+    available.vals = names(new.params[[as.character(pft)]])
+      
+    # overwrite default parameters where prior-drawn parameter are available
+      
+    # MK: if original is over 5000, this should probably be the same value drawn in the other part of the script
+    if ("SLA" %in% available.vals) {
+      sla_use <- (1/new.params[[as.character(pft)]]$SLA)*1000
+      sla_use[sla_use>5000] <- rnorm(1,4000,100)
+      all.params$FWT[pft.ind] <- sla_use
+    }
+    if ("HTMAX" %in% available.vals & "DBHMAX" %in% available.vals) {
+      all.params$B2[pft.ind] <- 2 * (((new.params[[as.character(pft)]]$HTMAX * 100) - 137) / 
+                                       (new.params[[as.character(pft)]]$DBHMAX * 100))
+      all.params$B3[pft.ind] <- (new.params[[as.character(pft)]]$HTMAX * 100 - 137) / (new.params[[as.character(pft)]]$DBHMAX * 100^2)
+    }
+    if ("root2shoot" %in% available.vals) {
+      all.params$RTST[pft.ind] <- new.params[[as.character(pft)]]$root2shoot
+    }
+    if ("DMAX" %in% available.vals) {
+      all.params$DMAX[pft.ind] <- new.params[[as.character(pft)]]$DMAX
+    }
+    if ("DMIN" %in% available.vals) {
+      all.params$DMIN[pft.ind] <- new.params[[as.character(pft)]]$DMIN
+    }
+    if ("AGEMX" %in% available.vals) {
+      all.params$AGEMX[pft.ind] <- new.params[[as.character(pft)]]$AGEMX
+    }
+    if ("Gmax" %in% available.vals) {
+      all.params$G[pft.ind] <- new.params[[as.character(pft)]]$Gmax
+    }
+    if ("SPRTND" %in% available.vals) {
+      all.params$SPRTND[pft.ind] <- new.params[[as.character(pft)]]$SPRTND
+    }
+    if ("SPRTMN" %in% available.vals) {
+      all.params$SPRTMN[pft.ind] <- new.params[[as.character(pft)]]$SPRTMN
+    }
+    if ("SPRTMX" %in% available.vals) {
+      all.params$SPRTMX[pft.ind] <- new.params[[as.character(pft)]]$SPRTMX
+    }
+    if ("MPLANT" %in% available.vals) {
+      all.params$MPLANT[pft.ind] <- new.params[[as.character(pft)]]$MPLANT
+    }
+    if ("D3" %in% available.vals) {
+      all.params$D3[pft.ind] <- new.params[[as.character(pft)]]$D3
+    }
+    if ("FROST" %in% available.vals) {
+      all.params$FROST[pft.ind] <- new.params[[as.character(pft)]]$FROST
+    }
+    if ("CM1" %in% available.vals) {
+      all.params$CM1[pft.ind] <- new.params[[as.character(pft)]]$CM1
+    }
+    if ("CM2" %in% available.vals) {
+      all.params$CM2[pft.ind] <- new.params[[as.character(pft)]]$CM2
+    }
+    if ("CM3" %in% available.vals) {
+      all.params$CM3[pft.ind] <- new.params[[as.character(pft)]]$CM3
+    }
+    if ("CM4" %in% available.vals) {
+      all.params$CM4[pft.ind] <- new.params[[as.character(pft)]]$CM4
+    }
+    if ("CM5" %in% available.vals) {
+      all.params$CM5[pft.ind] <- new.params[[as.character(pft)]]$CM5
+    }
+    if ("SLTA" %in% available.vals) {
+      all.params$SLTA[pft.ind] <- new.params[[as.character(pft)]]$SLTA
+    }
+    if ("SLTB" %in% available.vals) {
+      all.params$SLTB[pft.ind] <- new.params[[as.character(pft)]]$SLTB
+    }
+    if ("FRT" %in% available.vals) {
+      all.params$FRT[pft.ind] <- new.params[[as.character(pft)]]$FRT
+    }
+  }
+    
+  # remove all parameters not to be used in distance calculation 
+  # TL is a categorial variable so doesn't make sense to consider for distance 
+  remove.ids <- which(names(all.params) %in% c('Spp_Name', 'Spp_Number', 'TL'))
+  all.params <- all.params[,-c(remove.ids)]
+  rownames(all.params) <- spp.params.default$Spp_Name
+  
+  # calculate distance matrix of standardized parameter matrix 
+  distances <- as.matrix(dist(scale(all.params), method = 'euclidean',upper = TRUE, diag=TRUE))
+  distance.matrix <- distances
+  
+  # place similarity rankings in rows of distance.matrix for each species
+  for (i in 1:nrow(distances)){
+    ord <- sort(distances[i,], index.return=TRUE)$ix
+    distance.matrix[i,] = sapply(c(1:ncol(distances)), function(col.ind){which(ord == col.ind)-1})
+  }
+  
   ## HACK
   
   # skip ensemble member if no file availible
@@ -177,13 +255,14 @@ write_restart.LINKAGES <- function(outdir, runid, start.time, stop.time,
     n.index <- c(n.index, rep(i, ntrees[i]))
   }
   
-  if(max(dbh) < 20){ # if all trees are small than large trees are 95th percentile otherwise trees bigger than 5 cm
-    large.trees <- which(dbh >= (max(dbh) / 1.05))
+  if(max(dbh) < 20){ # if all trees are small than large trees are 95th percentile otherwise trees bigger than 20 cm
+    #large.trees <- which(dbh >= (max(dbh) / 1.05))
+    large.trees <- which(dbh >= quantile(dbh, 0.95))
   }else{
     large.trees <- which(dbh >= 20)
   }
   
-  large.trees <- which(dbh > 0)
+  #large.trees <- which(dbh > 0)
   
   for (s in seq_along(settings$pfts)) {
     ntrees[s] <- length(which(n.index[large.trees] == s))

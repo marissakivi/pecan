@@ -146,7 +146,7 @@ services:
       - pecan
     environment:
       - UNICORN_WORKER_PROCESSES=1
-      - SECRET_KEY_BASE=${BETY_SECRET_KEY:-notasecret}
+     # - SECRET_KEY_BASE=${BETY_SECRET_KEY:-notasecret}
       - RAILS_RELATIVE_URL_ROOT=/bety
       - LOCAL_SERVER=${BETY_LOCAL_SERVER:-99}
     depends_on:

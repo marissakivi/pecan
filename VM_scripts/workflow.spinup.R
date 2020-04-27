@@ -151,6 +151,15 @@ writeLines(name)
 # read in new adjusted settings
 settings <- PEcAn.settings::read.settings("pecan.TRAIT.xml")
 
+# run the PEcAn meta.analysis to get SLA values
+if(!is.null(settings$meta.analysis)) {
+  if (PEcAn.utils::status.check("META") == 0){
+    PEcAn.utils::status.start("META")
+    PEcAn.MA::runModule.run.meta.analysis(settings)
+    PEcAn.utils::status.end()
+  }
+}
+
 # write model specific configs with met ensembles
 if (PEcAn.utils::status.check("CONFIG") == 0){
   PEcAn.utils::status.start("CONFIG")
