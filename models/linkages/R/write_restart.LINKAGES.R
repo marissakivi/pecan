@@ -256,14 +256,16 @@ write_restart.LINKAGES <- function(outdir, runid, start.time, stop.time,
     n.index <- c(n.index, rep(i, ntrees[i]))
   }
   
-  if(max(dbh) < 20){ # if all trees are small than large trees are 95th percentile otherwise trees bigger than 20 cm
+  #if(max(dbh) < 20){ # if all trees are small than large trees are 95th percentile otherwise trees bigger than 20 cm
     #large.trees <- which(dbh >= (max(dbh) / 1.05))
-    large.trees <- which(dbh >= quantile(dbh, 0.95))
-  }else{
-    large.trees <- which(dbh >= 20)
-  }
+  #  large.trees <- which(dbh >= quantile(dbh, 0.95))
+  #}else{
+  #  large.trees <- which(dbh >= 20)
+  #}
   
-  #large.trees <- which(dbh > 0)
+  # following current assumptions for biomass data processing, only biomass for trees with DBH greater
+  # than 5 cm is considered in the data 
+  large.trees <- which(dbh > 5)
   
   for (s in seq_along(settings$pfts)) {
     ntrees[s] <- length(which(n.index[large.trees] == s))
