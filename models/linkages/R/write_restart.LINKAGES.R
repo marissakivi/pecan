@@ -59,15 +59,7 @@ write_restart.LINKAGES <- function(outdir, runid, start.time, stop.time,
   variables <- names(new.state)
   ### Going to need to change this... ### Get some expert opinion
   N <- length(new.state)
-  distance.matrix <- matrix(1, N, N)
-  for (i in seq_len(N)) {
-    distance.matrix[i, ] <- sample(c(seq(0, N-1, 1)), size = N)
-    if(which(distance.matrix[i,]==0)!=i){
-      distance.matrix[i,which(distance.matrix[i,]==0)] <- distance.matrix[i,i]
-      distance.matrix[i,i] <- 0
-    } 
 
-  
   ## HACK
   #spp.params.default <- read.csv(system.file("spp_matrix.csv", package = "linkages"))  #default spp.params
   spp.params.default <- read.csv("/data/dbfiles/spp_matrix.csv")  # default spp.params
@@ -119,9 +111,9 @@ write_restart.LINKAGES <- function(outdir, runid, start.time, stop.time,
   
   ## distance matrix calculation :: identify ranking for cloning species by identifying which species are closer together in parameter space
   # gather all species parameters into a dataframe 
-  all.params = spp.params.default 
+  all.params = spp.params
   
-  for (pft in spp.params.default$Spp_Name){
+  for (pft in spp.params$Spp_Name){
       
     # get information for specific PFT 
     pft.ind = which(all.params$Spp_Name == pft)
@@ -203,7 +195,7 @@ write_restart.LINKAGES <- function(outdir, runid, start.time, stop.time,
   # TL is a categorial variable so doesn't make sense to consider for distance 
   remove.ids <- which(names(all.params) %in% c('Spp_Name', 'Spp_Number', 'TL'))
   all.params <- all.params[,-c(remove.ids)]
-  rownames(all.params) <- spp.params.default$Spp_Name
+  rownames(all.params) <- spp.params$Spp_Name
   
   # calculate distance matrix of standardized parameter matrix 
   distances <- as.matrix(dist(scale(all.params), method = 'euclidean',upper = TRUE, diag=TRUE))
