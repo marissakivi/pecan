@@ -25,20 +25,21 @@ library(ggplot2)
 rm(list=ls())
 
 ### ADJUST VARIABLES HERE
-site = 'NORTHROUND'
+site = 'HARVARD'
 
 # input RDS data file location and name
 input = readRDS(paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/NPP_STAT_MODEL_',site,'.RDS'))
 
 # 98% plot save location and name
-plot.loc = paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda_priority_spp_plot12.jpg')
+plot.loc = paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda_priority_spp.jpg')
 
 # final data product save location
-output = paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda.obs.',site,'.plots12.Rdata')
+output = paste0('/Users/marissakivi/Desktop/PalEON/SDA/sites/',site,'/sda.obs.',site,'.Rdata')
 ###
 
 # Before anything else, let's remove all NA values in order to reduce variable size.
 input <- input %>% filter(!is.na(value))
+#input$taxon = as.character(input$taxon)
 
 ########### 1. Are there only 250 iterations included? ###########
 # The NPP stat model produces thousands of iterations of AGB estimates for each site. However, for
@@ -61,7 +62,7 @@ input = input %>% filter(type == 'ab') %>% select(-type)
 ########### 3. Which models are available for the site? ###########
 # First, look at the number of models used. If more than one, which model do you want to use?
 levels(input$model)
-model.pick = 'Model RW'
+model.pick = 'Model RW + Census'
 # Then, reduce the input data to be just that model.
 input = input %>% filter(model == model.pick) %>% select(-model)
 
@@ -75,7 +76,7 @@ names(input)
 names(input)[3] = 'plot'
 # Choose which plots you want to include. 
 unique(input$plot)
-plts = c(1,2)
+plts = c(1,2,3)
 input <- input %>% filter(plot %in% plts) %>% select(-plot)
 
 ################################################################################
@@ -118,8 +119,9 @@ melt.next <- reshape2::melt(cast.test, id = melt_id_next)
 mean_mat <- reshape2::dcast(melt.next, arguments2, mean)
 
 # determine overall cumulative biomass contribution of each species across all species 
-prior_mat <- mean_mat %>% group_by(taxon) %>% 
-  summarize(contr = sum(value)) %>%
+prior_mat <- mean_mat %>% 
+  dplyr::group_by(taxon) %>% 
+  dplyr::summarize(contr = sum(value)) %>%
   arrange(desc(contr))
 prior_mat$perc = prior_mat$contr/sum(prior_mat$contr,na.rm=T)
 prior_mat$cumsum = cumsum(prior_mat$perc)
@@ -135,8 +137,11 @@ pl
 
 # looking at the plot, record in the following vector the codes of the species whose points fall
 # under the red line 
-#species = c('QURU','ACRU','FAGR','BEAL','TSCA') # HF 
-species = c('FAGR','FRAM','BEAL','ACSA','TSCA')
+species = c('QURU','ACRU','FAGR','BEAL','TSCA') # HF 
+#species = c('FRAM','FAGR','BEAL','ACSA','TSCA') # NRP2
+#species = c('QURU','PIST','QUAL','ACRU','ACSA') # GE
+#species = c('QURU','PIST','PCRU','ACRU') #RH
+#species = c('TSCA','QURU','PIST','ACRU') # NRP34
 
 # save plot
 ggsave(pl, filename = plot.loc)
@@ -166,11 +171,19 @@ unique(melt.next$taxon)
 # name for each of your species IN THE SAME ORDER AS THE SPECIES VECTOR ABOVE. 
 
 species # for order 
-x = c('Fagus.Grandifolia_American.Beech.2',
-      'Fraxinus.Americana_White.Ash.2',
+x = c('Quercus.Rubra_Northern.Red.Oak.2',
+      'Acer.Rubrum_Red.Maple.2',
+      'Fagus.Grandifolia_American.Beech.2',
       'Betula.Alleghaniensis_Yellow.Birch.2',
-      'Acer.Saccharum_Sugar.Maple.2',
       'Tsuga.Canadensis_Hemlock.2')
+
+#     'Acer.Saccharum_Sugar.Maple.2',
+#     'Fraxinus.Americana_White.Ash.2',
+#     'Pinus.Strobus_White_Pine.2',
+#     'Quercus.Alba_White.Oak.2',
+#     'Picea.Rubens_Red.Spruce.2',
+ 
+
 x = paste0(var.names, '.',x)
 names(x) = species
 x
@@ -233,10 +246,12 @@ save(obs.list,file=output)
 
 ## Visualize mean AGB estimates for all species at site over time
 ggplot(mean_mat, aes(x = year, y = value, col = pft.cat)) +
-  geom_point() + 
-  geom_smooth(aes(group=pft.cat)) + 
-  labs(title = 'Biomass by PFT', 
+  geom_line(size = 2) + 
+  #geom_smooth(aes(group=pft.cat)) + 
+  labs(title = 'Harvard Forest: Biomass by PFT', 
        x = 'Year', 
        y = 'Aboveground Biomass (kgC/m2)', 
-       col = 'Species') 
+       col = 'Species')
+  #geom_vline(xintercept = 1938) +
+  #geom_vline(xintercept = 1960)
 
