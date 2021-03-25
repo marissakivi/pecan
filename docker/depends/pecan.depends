@@ -10,7 +10,7 @@ RGL_USE_NULL=TRUE
 
 # install remotes first in case packages are references in dependencies
 installGithub.r \
-    araiho/linkages_package \
+    marissakivi/linkages_package \
     ebimodeling/biocro \
     MikkoPeltoniemi/Rpreles \
     ropensci/geonames \

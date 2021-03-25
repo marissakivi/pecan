@@ -188,6 +188,7 @@ services:
     volumes:
       - pecan:/data
       - ./:/home/carya
+      - /data/:/save
 
         #rstudio2: 
         # image: pecan/base:${PECAN_VERSION:-develop}
@@ -205,21 +206,21 @@ services:
         #- pecan:/data
         #- ./:/home/carya
 
-  rstudio3: 
-    image: pecan/base:${PECAN_VERSION:-develop}
-    restart: unless-stopped
-    networks:
-      - pecan
-    environment:
-      - USER=${PECAN_RSTUDIO_USER:-acer}
-      - PASSWORD=${PECAN_RSTUDIO_PASS:-rubrum}
-      - ROOT=TRUE
-    entrypoint: /init
-    ports:
-      - "3000:8787"
-    volumes:
-      - pecan:/data
-      - ./:/home/acer 
+  #rstudio3: 
+  # image: pecan/base:${PECAN_VERSION:-develop}
+  # restart: unless-stopped
+  # networks:
+  #   - pecan
+  # environment:
+  #   - USER=${PECAN_RSTUDIO_USER:-acer}
+  #   - PASSWORD=${PECAN_RSTUDIO_PASS:-rubrum}
+  #   - ROOT=TRUE
+  # entrypoint: /init
+  # ports:
+  #   - "3000:8787"
+  # volumes:
+  #   - pecan:/data
+  #   - ./:/home/acer 
 
 
   # ----------------------------------------------------------------------
@@ -298,43 +299,43 @@ services:
   # ----------------------------------------------------------------------
 
   # PEcAn sipnet model runner
-  sipnet:
-    image: pecan/model-sipnet-git:${PECAN_VERSION:-develop}
-    restart: unless-stopped
-    networks:
-      - pecan
-    environment:
-      - RABBITMQ_URI=${RABBITMQ_URI:-amqp://guest:guest@rabbitmq/%2F}
-    depends_on:
-       - rabbitmq
-    volumes:
-      - pecan:/data
+  # sipnet:
+  #  image: pecan/model-sipnet-git:${PECAN_VERSION:-develop}
+  #  restart: unless-stopped
+  #  networks:
+  #    - pecan
+  #  environment:
+  #    - RABBITMQ_URI=${RABBITMQ_URI:-amqp://guest:guest@rabbitmq/%2F}
+  #  depends_on:
+  #     - rabbitmq
+  #  volumes:
+  #    - pecan:/data
 
   # PEcAn ED model runner
-  ed2:
-    image: pecan/model-ed2-git:${PECAN_VERSION:-develop}
-    restart: unless-stopped
-    networks:
-      - pecan
-    environment:
-      - RABBITMQ_URI=${RABBITMQ_URI:-amqp://guest:guest@rabbitmq/%2F}
-    depends_on:
-       - rabbitmq
-    volumes:
-      - pecan:/data
+  #ed2:
+  #  image: pecan/model-ed2-git:${PECAN_VERSION:-develop}
+  #   restart: unless-stopped
+  #  networks:
+  #    - pecan
+  #  environment:
+  #    - RABBITMQ_URI=${RABBITMQ_URI:-amqp://guest:guest@rabbitmq/%2F}
+  #  depends_on:
+  #     - rabbitmq
+  #  volumes:
+  #    - pecan:/data
 
   # PEcAn MAESPA model runner
-  maespa:
-    image: pecan/model-maespa-git:${PECAN_VERSION:-develop}
-    restart: unless-stopped
-    networks:
-      - pecan
-    environment:
-      - RABBITMQ_URI=${RABBITMQ_URI:-amqp://guest:guest@rabbitmq/%2F}
-    depends_on:
-       - rabbitmq
-    volumes:
-      - pecan:/data
+  #maespa:
+  #  image: pecan/model-maespa-git:${PECAN_VERSION:-develop}
+  #  restart: unless-stopped
+  #  networks:
+  #    - pecan
+  #  environment:
+  #    - RABBITMQ_URI=${RABBITMQ_URI:-amqp://guest:guest@rabbitmq/%2F}
+  #  depends_on:
+  #     - rabbitmq
+  #  volumes:
+  #    - pecan:/data
         
   # PEcAn LINKAGES model runner
   linkages:

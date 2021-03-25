@@ -22,9 +22,10 @@ library(dplyr)
 library(PEcAn.DB)
 
 # load prior information
-all.priors <- read.csv('~/data_files/priors-04-2020.csv', header = T)
+all.priors <- read.csv('~/data_files/priors-03-2021.csv', header = T)
 pfts <- as.vector(unique(all.priors$pft))
 if (pfts[length(pfts)]=='') pfts = pfts[1:(length(pfts)-1)]
+
 
 # make bety connection
 bety <- list(user = 'bety',
@@ -35,7 +36,7 @@ bety <- list(user = 'bety',
              write = TRUE)
 modeltype =  "1000000008" # linkages model 
 dbcon <- db.open(bety)
-on.exit(db.close(dbcon))
+#on.exit(db.close(dbcon))
 
 # variable names that are needed for LINKAGES species: 
 pars = c('DMAX','DMIN','HTMAX','AGEMX','DBHMAX','Gmax','SPRTND','SPRTMN','SPRTMX','MPLANT','D3',
@@ -136,7 +137,7 @@ for (pft in pft_names){
     if (length(existing.prior$name) > 0){
       if (existing.prior$parama == parama & existing.prior$paramb == paramb & existing.prior$distn == distn){
         add = FALSE
-        print('existing.prior is good')
+        #print('existing.prior is good')
       }
     }
     
@@ -214,5 +215,6 @@ for (pft in pft_names){
   }
 }
 
+db.close(bety)
 
 

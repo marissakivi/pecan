@@ -21,7 +21,7 @@ Suggests:
     testthat (>= 1.0.2),
     linkages
 Remotes:
-  github::araiho/linkages_package
+  github::marissakivi/linkages_package
 SystemRequirements: LINKAGES
 OS_type: unix
 License: BSD_3_clause + file LICENSE

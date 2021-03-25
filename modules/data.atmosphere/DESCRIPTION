@@ -19,7 +19,6 @@ Depends:
     methods
 Imports:
     abind (>= 1.4.5),
-    car,
     data.table,
     dplyr,
     geonames (> 0.998),
