@@ -1,5 +1,5 @@
 # this needs to be at the top, what version are we building
-ARG IMAGE_VERSION="latest"
+ARG IMAGE_VERSION="develop"
 
 # ----------------------------------------------------------------------
 # compile bookdown to html

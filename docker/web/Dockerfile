@@ -1,4 +1,4 @@
-FROM php:apache
+FROM php:7-apache
 MAINTAINER Rob Kooper <kooper@illinois.edu>
 
 # ----------------------------------------------------------------------
@@ -8,11 +8,15 @@ RUN apt-get update \
     && apt-get install -y \
         libpq-dev \
         librabbitmq-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && docker-php-ext-install -j$(nproc) pdo pdo_pgsql \
-    && pecl install amqp \
-    && docker-php-ext-enable amqp \
-    && mkdir -p /data/workflows /data/dbfiles \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN  docker-php-ext-install -j$(nproc) pdo pdo_pgsql
+
+RUN pecl install amqp 
+
+RUN docker-php-ext-enable amqp 
+
+RUN mkdir -p /data/workflows /data/dbfiles \
     && chown www-data /data/workflows /data/dbfiles 
 
 RUN addgroup --gid 1000 editors \

@@ -8,6 +8,8 @@ set -e
 # Don't use X11 for rgl
 RGL_USE_NULL=TRUE
 
+install2.r mgcv
+
 # install remotes first in case packages are references in dependencies
 installGithub.r \
     marissakivi/linkages_package \
