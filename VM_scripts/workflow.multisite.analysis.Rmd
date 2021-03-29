@@ -1,0 +1,423 @@
+---
+title: "Multisite Short Run SDA Analysis"
+author: "Marissa Kivi"
+date: "1/4/2021"
+output: html_document
+---
+
+Things to reconsider: 
+- how are we deciding our cutoffs for significance, correlation, and good ensembles?
+- are there other ways to consider non-linear datasets?
+
+```{R, echo = FALSE, include = FALSE}
+rm(list=ls())
+library(mvtnorm)
+library(PEcAn.workflow)
+library(PEcAn.settings)
+library(ggplot2)
+library(gridExtra)
+library(boot)
+library(reshape2)
+library(dplyr)
+library(class)
+library(GGally)
+library(randomForest)
+```
+
+# Step 0: Prepare data
+
+## A. Load data for each site
+
+```{R, echo = FALSE}
+
+# list of site workflow IDs
+sites = c(14000000231,14000000233)
+data.list = list()
+
+# load all datasets for sites 
+for (i in seq_along(sites)){
+  id = sites[i]
+  load(paste0('/save/workflows/PEcAn_',toString(id),'/analysis.Rdata'))
+  data.list[[i]] = data
+}
+```
+
+## B. Prepare data for steps
+
+```{R, echo = F}
+# Preliminary organization
+param.melt = data.list[[1]]$param.melt
+weight.melt = data.list[[1]]$weight.melt
+bias.melt = data.list[[1]]$bias.melt %>% mutate(year = year - 1 + min(data.list[[1]]$run.list[[1]]$year))
+spp = data.list[[1]]$spp
+for (i in 2:length(sites)){
+  param.melt = rbind(param.melt,data.list[[i]]$param.melt)
+  weight.melt = rbind(weight.melt,data.list[[i]]$weight.melt)
+  bias.melt = rbind(bias.melt, data.list[[i]]$bias.melt  %>% 
+                      mutate(year = year - 1 + min(data.list[[i]]$run.list[[1]]$year)))
+  spp = c(spp,data.list[[i]]$spp)
+}
+
+# average weights over time
+avg.wts = weight.melt %>% group_by(ensemble) %>% summarize(wt = mean(weight))
+
+# organize run.list by species, not site 
+#spp = c('Red.Maple.2','Northern.Red.Oak.2','Hemlock.2','White.Pine.2','American.Beech.2','Yellow.Birch.2')
+spp = c('Red.Maple.2','Northern.Red.Oak.2')
+run.list = list()
+for (ind in seq_along(spp)){
+  
+  this.spp = NULL
+  s = spp[ind]
+  
+  for (i in seq_along(sites)){
+    # is this species present at the site
+    if (s %in% data.list[[i]]$spp){
+      
+      # if yes, grab the data and add it to the data from other sites
+      spp.ind = which(data.list[[i]]$spp == s)
+      if (is.null(this.spp)){
+        this.spp = data.list[[i]]$run.list[[spp.ind]]
+      }else{
+        this.spp = rbind(this.spp, data.list[[i]]$run.list[[spp.ind]])
+      }
+    }
+  }
+  run.list[[ind]] = this.spp 
+}
+```
+
+# Step 1: Look at parameter ranges compared to forecast accuracy 
+
+```{R, echo = FALSE, messages = FALSE, warnings = FALSE}
+
+## ADJUST SPECIES HERE
+ind = 2
+s = spp[ind]
+
+# gather data
+data.now = param.melt %>% filter(species == s) %>% dplyr::select(-species)
+data.cast = dcast(data.now, ensemble ~ p.name, value.var = 'p.value') %>% 
+  left_join(run.list[[ind]] %>% mutate(ensemble = ens) %>% group_by(ensemble) %>% summarize(avg.bias = mean(bias)) %>% ungroup(), by = 'ensemble')
+
+# mark those forecasts that were OK
+data.cast = data.cast %>% mutate(class = ifelse(abs(avg.bias) < 0.1,1,0)) %>% 
+  dplyr::select(-avg.bias, -ensemble)
+  
+# are there inaccurate ensembles?
+if (length(unique(data.cast$class))<2) next
+  
+# barplot of importance rankings
+forest3=randomForest(as.factor(class)~., data=data.cast, na.action = na.omit)
+vi_imp3 = importance(forest3)
+vi_sort3 = sort(vi_imp3, decreasing = TRUE, index.return=TRUE)
+vi.df3 = data.frame(par = rownames(vi_imp3)[vi_sort3$ix], imp = vi_sort3$x)
+barplot(vi.df3$imp, main = s)
+```
+
+# Plot those found to be important
+
+```{R, message=FALSE, warnings=FALSE, echo = FALSE}
+
+# from the barplots above, determine how many variables we want to keep for each species
+cuts = 1
+
+for (j in 1:cuts){
+  dat1 = data.cast[,vi.df3$par[j]]
+  dat2 = data.cast$class
+  df = data.frame(dat1=dat1,dat2=dat2)
+  plt = ggplot(df) + geom_histogram(aes(x=dat1,fill=as.factor(dat2))) +
+    labs(title = paste(spp,vi.df3$par[j]), 
+         x = 'value', 
+         fill = 'class')
+  print(plt)
+}
+
+```
+
+
+# Step 2: Investigate significant environmental conditions for the productivity of each species
+
+```{R, echo = FALSE, messages = FALSE, warnings = FALSE}
+
+# save data frame for important predictors
+to_save = data.frame(slope = NA, term = NA, varname1 = NA, varname2 = NA, type = NA, pft = NA,
+                     stringsAsFactors = FALSE)
+
+# loop through species 
+for (ind in seq_along(spp)){
+
+  s = spp[ind]
+  print(spp[ind])
+
+  # gather data and calculate weights based on total bias
+  data.now = run.list[[ind]] %>% mutate(ensemble = ens) %>% dplyr::select(-weight, -ens, -pred) %>%
+    #left_join(bias.melt, by = c('ensemble','year')) %>% 
+    #dplyr::select(-site, -year, -ensemble) %>% 
+    mutate(weight = dnorm(bias, mean = 0, sd = sd(bias))) %>% 
+    mutate(weight = weight/sum(weight)) %>%
+    dplyr::select(-bias, -ensemble, -year)
+  
+  # get environmental variable names 
+  vars = names(data.now)[!(names(data.now) %in% c('adj','weight'))]
+  
+  # create data.trans which contains the standardized data matrix
+  data.trans = as.data.frame(scale(data.now %>% select(-weight)))
+  data.trans$weight = data.now$weight
+  
+  # fit full model containing all individual predictors and interactions
+  terms.full = vars
+  for (v1 in 1:(length(vars)-1)){
+    for (v2 in (v1+1):(length(vars))){
+     terms.full = c(terms.full, paste0(vars[v1],'*',vars[v2]))
+    }
+  }
+  full.eq = paste0('adj~',paste(terms.full,collapse='+'))
+  mod.full = lm(as.formula(full.eq), data = data.trans, weights = data.trans$weight)
+  
+  # perform forward stepwise model selection using BIC
+  mod.null = lm(adj~1, data = data.trans, weights = data.trans$weight)
+  n = length(data.trans$weight)
+  forward.step.BIC = step(mod.null, k = log(n), direction="both",scope=list(upper=mod.full,lower=mod.null))
+
+  # extract reduced model terms
+  terms.reduced = rownames(coef(summary(forward.step.BIC)))[-1]
+  param.reduced = unlist(
+    lapply(terms.reduced, 
+          function(x){
+            # if interaction term, need to separate
+            if (grepl(':',x)){
+              unlist(strsplit(x, ":"))
+              }else{
+                x
+                }
+            }))
+  param.reduced = c(unique(param.reduced), 'adj')
+  slopes.reduced = coef(summary(forward.step.BIC))[-1,1]
+
+  # make into a dataframe for easier sorting
+  type = rep('single',length(terms.reduced))
+  type[grep(':', terms.reduced)] = 'inter'
+  varname1 = vector()
+  varname2 = vector()
+  for (v in seq_along(terms.reduced)){
+    term = terms.reduced[v]
+    terms = strsplit(term,':')
+    varname1[v] = terms[[1]][1]
+    varname2[v] = ifelse(is.na(terms[[1]][2]), NA, terms[[1]][2])
+  }
+  
+  # standardize slopes 
+  slopes.reduced = slopes.reduced / sum(abs(slopes.reduced))
+  
+  # add to save dataframe
+  to_save = rbind(to_save, data.frame(slope = slopes.reduced, term = terms.reduced, varname1 = varname1,
+                                      varname2 = varname2, type = type, pft = rep(s,length(slopes.reduced)),
+                                      stringsAsFactors = FALSE) %>% arrange(type,desc(abs(slope))))
+}
+
+to_save = to_save[-1,]
+
+```
+
+## C. Look at model terms with visualizations
+
+``` {R}
+
+# plot for single predictors
+pl1 = ggplot(to_save %>% filter(type == 'single')) + 
+  geom_col(aes(x = varname1, y = abs(slope), fill = varname1)) + 
+  facet_wrap(~pft) + 
+  labs(x = 'variable', y = 'slope') + 
+  theme(axis.ticks = element_blank(), 
+        axis.text.x = element_blank())
+print(pl1)
+
+# plot for predictor terms
+for (ind in seq_along(spp)){
+  
+  s = spp[ind]
+  
+  this.spp = to_save %>% filter(type == 'single', pft == spp[ind])
+  if (length(this.spp$slope) < 1) next
+  
+  this.data = run.list[[ind]] %>% mutate(ensemble = ens) %>% dplyr::select(-bias, -weight, -ens, -pred) %>%
+    left_join(bias.melt, by = c('ensemble','year')) %>% 
+    dplyr::select(-site, -year, -ensemble) %>% 
+    mutate(weight = dnorm(bias, mean = 0, sd = sd(bias))) %>% 
+    mutate(weight = weight/sum(weight))
+  
+  for (term in seq_along(this.spp$varname1)){
+    
+    var1.plot = this.spp$varname1[term]
+    importance = this.spp$slope[term]
+    mod.plot = lm(as.formula(paste0('adj~',var1.plot)), data = this.data, weights = this.data$weight)
+    
+    pl = ggplot() +
+      geom_point(data = this.data, aes_string(x=var1.plot,y='adj',col='weight')) +
+      geom_abline(slope = coef(mod.plot)[2], intercept = coef(mod.plot)[1]) + 
+      labs(x=var1.plot, y='adjusted growth', 
+           title = paste(s,'(',round(importance,3),')'))
+    print(pl)
+  }
+}
+
+# plot for interaction terms 
+for (ind in seq_along(spp)){
+  
+  s = spp[ind]
+  
+  this.spp = to_save %>% filter(type == 'inter', pft == spp[ind])
+  if (length(this.spp$slope) < 1) next
+  
+  this.data = run.list[[ind]]
+  y.min = min(this.data$adj)
+  y.max = max(this.data$adj)
+  breaks = c(y.min-0.1,quantile(this.data$adj, c(0.025,0.5,0.975)), y.max+0.1)
+  this.data$breaks = as.factor(.bincode(this.data$adj,breaks, TRUE))
+  
+  for (term in seq_along(this.spp$varname1)){
+    
+    var1.plot = this.spp$varname1[term]
+    var2.plot = this.spp$varname2[term]
+    importance = this.spp$slope[term]
+    
+    pl = ggplot() +
+      geom_point(data = this.data, aes_string(x=var1.plot,y=var2.plot)) +
+      geom_point(data = (this.data %>% filter(breaks == 4)), aes_string(x=var1.plot,y=var2.plot), color = 'blue') + 
+      geom_point(data = (this.data %>% filter(breaks == 1)), aes_string(x=var1.plot,y=var2.plot), color = 'orange') + 
+      labs(x=var1.plot, y=var2.plot, 
+           title = paste(s,'(',round(importance,3),')')) #+ 
+      #scale_color_manual(values = c('1'='yellow','2'='orange','3'='red','4'='purple'))
+      #scale_color_manual(values = c('Highest Growth'='Purple','Lowest Growth'='Orange'))
+    print(pl)
+  }
+}
+
+```
+
+
+# Step 6: Identify environmental conditions under which LINKAGES performs poorly for each species. 
+
+## A. Consider importance ranking of all environmental variables for predicting accuracy of model forecasts for each species biomass.  
+
+We consider all ensembles in this section.
+
+```{R,message=FALSE, warnings=FALSE, echo = FALSE}
+
+# determine how many variables to consider for each species
+# if there is no plot for a species, it signifies that the ensembles that included the species were all considered "accurate" or "inaccurate"
+
+## ADJUST SPECIES HERE
+ind = 2
+s = spp[ind]
+
+# gather data
+data.now = run.list[[ind]] 
+vars = names(data.now)[-c(1:6)]
+
+# mark those forecasts that were OK
+data.now = data.now %>% mutate(class = ifelse(abs(bias) < 0.1 ,1,0)) %>% 
+  dplyr::select(-ens, -year, -pred, -adj, -bias, -weight)
+  
+# are there inaccurate ensembles?
+if (length(unique(data.now$class))<2) next
+  
+# barplot of importance rankings
+forest3=randomForest(as.factor(class)~., data=data.now, na.action = na.omit)
+vi_imp3 = importance(forest3)
+vi_sort3 = sort(vi_imp3, decreasing = TRUE, index.return=TRUE)
+vi.df3 = data.frame(par = rownames(vi_imp3)[vi_sort3$ix], imp = vi_sort3$x)
+barplot(vi.df3$imp, main = s)
+
+```
+Consider barplot to determine how many variables we want to consider further. 
+
+## B. Plot those variables that have been deemed to be "important."
+
+Do we see clear separation in the variable value range between where LINKAGES is predicting correctly and incorrectly?
+
+```{R, message=FALSE, warnings=FALSE, echo = FALSE}
+
+# from the barplots above, determine how many variables we want to keep for each species
+cuts = 5
+
+for (j in 1:cuts){
+  dat1 = data.now[,vi.df3$par[j]]
+  dat2 = data.now$class
+  df = data.frame(dat1=dat1,dat2=dat2)
+  plt = ggplot(df) + geom_histogram(aes(x=dat1,fill=as.factor(dat2))) +
+    labs(title = paste(spp,vi.df3$par[j]), 
+         x = 'value', 
+         fill = 'class')
+  print(plt)
+}
+
+```
+
+## C. Consider pairs of environmental variables using importance ranking. 
+
+
+```{R,message=FALSE, warnings=FALSE, echo = FALSE}
+
+# create matrix to save interaction values 
+nvars = length(names(data.now %>% dplyr::select(-class)))
+vnames = names(data.now %>% dplyr::select(-class))
+df4 = matrix(NA,length(data.now$class),(1+nvars^2))
+names = c('class')
+df4[,1] = data.now$class
+  
+# calculate interaction terms and place in matrix 
+trk = 2
+for (i in 1:(nvars-1)){
+  for (j in (i+1):nvars){
+    df4[,trk] = data.now[,i] * data.now[,j]
+    trk = trk + 1
+    
+    # get the column name for interaction term 
+    names = c(names, paste0(vnames[i],'_',vnames[j]))
+  }
+}
+  
+# crop the matrix where the data ends and add tracked column names
+df4 = df4[,1:(trk-1)]
+colnames(df4) = names
+df4 = as.data.frame(df4)
+
+# find importance rankings for each interaction
+forest4=randomForest(factor(class)~., data=df4, na.action=na.omit)
+vi_imp4 = importance(forest4)
+vi_sort4 = sort(vi_imp4, decreasing = TRUE, index.return=TRUE)
+vi.df4 = data.frame(par = rownames(vi_imp4)[vi_sort4$ix], imp = vi_sort4$x)
+print(barplot(vi.df4$imp, main = s))
+
+```
+
+
+Consider generated barplot to determine how many interaction terms we want to consider further. Where is the elbow?
+
+## D. Plot those interaction pairs that have been deemed to be "important."
+
+```{r,message=FALSE, warnings=FALSE, echo = FALSE}
+
+# define cutoffs for each species
+cuts = 3
+
+# iterate through the important interaction terms and plot
+for (i in 1:cuts){
+  
+  # extract the required variables 
+  vars = strsplit(toString(vi.df4$par[i]), split = '_')
+  var1 = vars[[1]][1]
+  var2 = vars[[1]][2]
+    
+  # create plot
+  pl = ggplot() +
+    geom_point(data = (data.now %>% filter(class == 1)), aes_string(x=var1, y=var2), color = 'blue', alpha = 0.3) + 
+    geom_point(data = (data.now %>% filter(class == 0)), aes_string(x=var1, y=var2), color = 'red', alpha = 0.3) + 
+    labs(col = 'Class', title = paste(s,'::',var1,'vs.',var2))
+  print(pl)
+}
+
+```
+

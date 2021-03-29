@@ -189,10 +189,10 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
       #The purpose of this step is to impute data for mu.f 
       #where there are zero values so that 
       #mu.f is in 'tobit space' in the full model
-      constants.tobit2space <<- list(N = nrow(X),
+      constants.tobit2space <- list(N = nrow(X),
                                      J = length(mu.f))
       
-      data.tobit2space <<- list(y.ind = x.ind,
+      data.tobit2space <- list(y.ind = x.ind,
                                 y.censored = x.censored,
                                 mu_0 = rep(0,length(mu.f)),
                                 lambda_0 = diag(1000,length(mu.f)), #can try solve
@@ -206,7 +206,7 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
                                                            cholesky = chol(solve(stats::cov(X)))))
       
       #ptm <- proc.time()
-      tobit2space_pred <<- nimbleModel(tobit2space.model, data = data.tobit2space,
+      tobit2space_pred <- nimbleModel(tobit2space.model, data = data.tobit2space,
                                        constants = constants.tobit2space, inits = inits.tobit2space(),
                                        name = 'space')
       
@@ -215,13 +215,13 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
       if(logprob_y_tobit2space < -1000000) logger.warn(paste('Log probability very low for y in tobit2space model during time',t,'. Check initial conditions.'))
       
       ## Adding X.mod,q,r as data for building model.
-      conf_tobit2space <<- configureMCMC(tobit2space_pred, thin = 10, print=TRUE)
+      conf_tobit2space <- configureMCMC(tobit2space_pred, thin = 10, print=TRUE)
       conf_tobit2space$addMonitors(c("pf", "muf","y.censored"))
       
       conf_tobit2space$removeSampler('pf')
       conf_tobit2space$addSampler('pf','conj_wt_wishart_sampler')
       
-      samplerNumberOffset_tobit2space <<- length(conf_tobit2space$getSamplers())
+      samplerNumberOffset_tobit2space <- length(conf_tobit2space$getSamplers())
       
       for(j in seq_along(mu.f)){
         for(n in seq_len(nrow(X))){
@@ -232,11 +232,11 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
         }
       }
       
-      Rmcmc_tobit2space <<- buildMCMC(conf_tobit2space)
+      Rmcmc_tobit2space <- buildMCMC(conf_tobit2space)
       
       #restarting at good initial conditions is somewhat important here
-      Cmodel_tobit2space <<- compileNimble(tobit2space_pred)
-      Cmcmc_tobit2space <<- compileNimble(Rmcmc_tobit2space, project = tobit2space_pred)
+      Cmodel_tobit2space <- compileNimble(tobit2space_pred)
+      Cmcmc_tobit2space <- compileNimble(Rmcmc_tobit2space, project = tobit2space_pred)
       
       for(i in seq_along(X)) {
         ## ironically, here we have to "toggle" the value of y.ind[i]
@@ -244,6 +244,18 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
         ## indicator variable is set to 0, which specifies *not* to sample
         valueInCompiledNimbleFunction(Cmcmc_tobit2space$samplerFunctions[[samplerNumberOffset_tobit2space+i]], 'toggle', 1-x.ind[i])
       }
+      
+      utils::globalVariables(
+        'constants.tobit2space',
+        'data.tobit2space',
+        'inits.tobit2space',
+        'tobit2space_pred',
+        'conf_tobit2space',
+        'samplerNumberOffset_tobit2space',
+        'Rmcmc_tobit2space',
+        'Cmodel_tobit2space',
+        'Cmcmc_tobit2space'
+      )
       
     }else{
       
@@ -263,6 +275,8 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
         ## indicator variable is set to 0, which specifies *not* to sample
         valueInCompiledNimbleFunction(Cmcmc_tobit2space$samplerFunctions[[samplerNumberOffset_tobit2space+i]], 'toggle', 1-x.ind[i])
       }
+      
+      
       
     }
     
@@ -344,13 +358,19 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
   
   ### create matrix the describes the support for each observed state variable at time t
   interval <- matrix(NA, length(obs.mean[[t]]), 2)
+  # Each observe variable needs to have its own file tag under inputs
+  interval <-settings$state.data.assimilation$inputs %>%
+    purrr::map_dfr( ~ data.frame(
+      .x$'min_value' %>% as.numeric(),.x$'max_value' %>% as.numeric()
+    )) %>%
+    as.matrix()
   rownames(interval) <- names(obs.mean[[t]])
-  for(i in 1:length(input.vars)){
-    interval[grep(x=rownames(interval),
-                  pattern=input.vars[i]), ] <- matrix(c(as.numeric(settings$state.data.assimilation$inputs[[i]]$min_value), #needs to be inputs because sometimes the observation is on a different scale than the state variable
-                                                        as.numeric(settings$state.data.assimilation$inputs[[i]]$max_value)),
-                                                      length(grep(x=rownames(interval),pattern=input.vars[i])),2,byrow = TRUE)
-  }
+  # for(i in 1:length(input.vars)){
+  #   interval[grep(x=rownames(interval),
+  #                 pattern=input.vars[i]), ] <- matrix(c(as.numeric(settings$state.data.assimilation$inputs[[i]]$min_value), #needs to be inputs because sometimes the observation is on a different scale than the state variable
+  #                                                       as.numeric(settings$state.data.assimilation$inputs[[i]]$max_value)),
+  #                                                     length(grep(x=rownames(interval),pattern=input.vars[i])),2,byrow = TRUE)
+  # }
   #### These vectors are used to categorize data based on censoring 
   #### from the interval matrix
   y.ind <- as.numeric(Y > interval[,1])
@@ -413,7 +433,7 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
   }
   
   if(t == 1 | recompileGEF){ 
-    constants.tobit <<- list(
+    constants.tobit <- list(
       N = ncol(X),
       YN = length(y.ind),
       X_direct_start = X_direct_start,
@@ -430,25 +450,26 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
       pft2total_TRUE = pft2total_TRUE
     )
     
-    dimensions.tobit <<- list(X = length(mu.f), X.mod = ncol(X),
+    dimensions.tobit <- list(X = length(mu.f), X.mod = ncol(X),
                               Q = c(length(mu.f),length(mu.f)),
                               y_star = (length(y.censored)))
     
-    data.tobit <<- list(muf = as.vector(mu.f),
+    data.tobit <- list(muf = as.vector(mu.f),
                         pf = solve(Pf), 
                         aq = aqq, bq = bqq,
                         y.ind = y.ind,
                         y.censored = y.censored,
                         r = R) #precision
     
-    inits.pred <<-
-      function()
+    inits.pred <-
+      function(){
         list(
           q = diag(ncol(X)) * stats::runif(1, length(mu.f), length(mu.f) + 1),
           X.mod = stats::rnorm(length(mu.f), mu.f, 1),
           X = stats::rnorm(length(mu.f), mu.f, .1),
           y_star = stats::rnorm(length(y.censored), 0, 1)
         )
+      }
     
     # 
     # inits.pred <- list(q = diag(length(mu.f))*(length(mu.f)+1),
@@ -456,13 +477,13 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
     #                   X = rnorm(length(mu.f),mu.f,1),
     #                   y_star = rnorm(length(y.censored),0,1))
     
-    model_pred <<- nimbleModel(tobit.model, data = data.tobit, dimensions = dimensions.tobit,
+    model_pred <- nimbleModel(tobit.model, data = data.tobit, dimensions = dimensions.tobit,
                                constants = constants.tobit, inits = inits.pred(),
                                name = 'base')
     
     model_pred$initializeInfo()
     ## Adding X.mod,q,r as data for building model.
-    conf <<- configureMCMC(model_pred, print=TRUE,thin = 10)
+    conf <- configureMCMC(model_pred, print=TRUE,thin = 10)
     conf$addMonitors(c("X","X.mod","q","Q", "y_star","y.censored")) 
     
     if(ncol(X) > length(y.censored)){
@@ -488,7 +509,7 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
     
     ## important!
     ## this is needed for correct indexing later
-    samplerNumberOffset <<- length(conf$getSamplers())
+    samplerNumberOffset <- length(conf$getSamplers())
     
     for(i in 1:length(y.ind)) {
       node <- paste0('y.censored[',i,']')
@@ -501,10 +522,10 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
     ## can monitor y.censored, if you wish, to verify correct behaviour
     #conf$addMonitors('y.censored')
     
-    Rmcmc <<- buildMCMC(conf)
+    Rmcmc <- buildMCMC(conf)
     
-    Cmodel <<- compileNimble(model_pred)
-    Cmcmc <<- compileNimble(Rmcmc, project = model_pred)
+    Cmodel <- compileNimble(model_pred)
+    Cmcmc <- compileNimble(Rmcmc, project = model_pred)
     
     for(i in 1:length(y.ind)) {
       ## ironically, here we have to "toggle" the value of y.ind[i]
@@ -512,6 +533,18 @@ GEF<-function(settings, Forecast, Observed, H, extraArg, nitr=50000, nburnin=100
       ## indicator variable is set to 0, which specifies *not* to sample
       valueInCompiledNimbleFunction(Cmcmc$samplerFunctions[[samplerNumberOffset+i]], 'toggle', 1-y.ind[i])
     }
+    
+    utils::globalVariables(
+      'constants.tobit',
+      'data.tobit',
+      'inits.tobit',
+      'model_pred',
+      'conf',
+      'samplerNumberOffset',
+      'Rmcmc',
+      'Cmodel',
+      'Cmcmc'
+    )
     
   }else{
     Cmodel$y.ind <- y.ind

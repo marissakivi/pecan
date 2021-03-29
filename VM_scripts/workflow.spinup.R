@@ -57,7 +57,7 @@ options(error=quote({
 }))
 
 # set working directory to workflow folder from spinup 
-workflowID = '14000000098'
+workflowID = '14000000236'
 setwd(paste0('/data/workflows/PEcAn_',workflowID))
 
 # --------------------------------------------------
@@ -72,11 +72,9 @@ setwd(paste0('/data/workflows/PEcAn_',workflowID))
 ### A. Go to the Terminal tab. 
 ### B. Paste the following commands in order, running each one separately. Pay attention to where you should be 
 ###    adjusting text for your own personal run. 
-    # pwd ---> here we are checking that we are in the correct directory (should be the workflow in question)
-    # su carya ---> this makes sure that any superuser permissions you gave carya are in effect 
-    # ---> type illinoiss for password
+    # cd /data/workflows
     # sudo chmod g+rw -R . ---> don't forget the period at the end here
-    # ---> type illinois for password 
+    # ---> type user password if prompted (you shouldn't be) 
 ### C. Return to the Console tab. 
 
 # ----------------------------------
@@ -89,9 +87,9 @@ setwd(paste0('/data/workflows/PEcAn_',workflowID))
 # them in the /data folder in a previous step. We also need to know how many ensembles you are running. Adjust the 
 # variables below.
 
-ensemble_location = '/data/dbfiles/met_data/HARVARD/weights/ensemble-weights-HARVARD-prism.csv'
-metdir <- '/data/dbfiles/met_data/NORTHROUND/linkages/'
-n = 200
+ensemble_location = '/data/dbfiles/met_data/ROOSTER/weights/ensemble-weights-ROOSTER-prism.csv'
+metdir <- '/data/dbfiles/met_data/ROOSTER/linkages/'
+n = 150
 
 ### A. Get our sampled list of met ensembles. 
 
@@ -101,7 +99,6 @@ clim_mods <- ens_wts$climate_model
 avg_wt <- ens_wts$wts
 
 # randomly select n models from list of climate models based on their weights
-# ANN: do we want to allow replacement here? do we just want to take the n most highly weighted ensembles?
 clim_use <- sample(x = clim_mods, size = n, prob = avg_wt, replace = T)
 
 # need to save wts so we can use it in SDA workflow 
@@ -141,13 +138,27 @@ writeLines(name)
 #   <end.year>1960</end.year>
 # </ensemble>
 
+###    If you want your meta analysis to give you wider posterior distributions for SLA <see your PFT folders>, 
+###    you should change the following "update" and "random effects" arguments in the XML. I did not normally do 
+###    this for my SDA runs, but I just wanted to leave a note on how to do it. 
+
+# <meta.analysis>
+#  <iter>3000</iter>
+#  <random.effects>
+#    <on>TRUE</on> ### change this from FALSE TO TRUE
+#    <use_ghs>TRUE</use_ghs>
+#  </random.effects>
+#  <threshold>1.2</threshold>
+#  <update>TRUE</update> ### change this from AUTO to TRUE 
+# </meta.analysis>
+
 ### D. Now, we have to adjust the STATUS file so that the workflow will write over the current config files. In the 
 ###    workflow folder, open the STATUS file in RStudio and erase all of the rows except TRAIT and META. There is an 
 ###    example below. Once done, save the file and close it. 
 
 # TRAIT	2019-09-04 19:28:32	2019-09-04 19:28:34	DONE	
-# META	2019-09-04 19:28:34	2019-09-04 19:28:34	DONE	
-# CONFIG	2019-09-04 19:28:34	2019-09-04 19:28:37	DONE	# Erase this row and all of the rows below it. 
+# META	2019-09-04 19:28:34	2019-09-04 19:28:34	DONE	# If you desire Random Effects, you should erase this row, too.
+# CONFIG	2019-09-04 19:28:34	2019-09-04 19:28:37	DONE # Erase this row and all of the rows below it.
 # MODEL	2019-09-04 19:28:37	2019-09-04 19:28:48	DONE	
 # OUTPUT	2019-09-04 19:28:48	2019-09-04 19:28:48	DONE	
 # ENSEMBLE	2019-09-04 19:28:48	2019-09-04 19:28:48	DONE	
@@ -234,7 +245,7 @@ if (PEcAn.utils::status.check("FINISHED") == 0) {
   PEcAn.utils::status.start("FINISHED")
   PEcAn.remote::kill.tunnel(settings)
   db.query(paste("UPDATE workflows SET finished_at=NOW() WHERE id=", 
-                 settings$workflow$id, "AND finished_at IS NULL"), 
+                 settings$workflow$id , "AND finished_at IS NULL"), 
            params = settings$database$bety)
   PEcAn.utils::status.end()
 }
@@ -285,7 +296,7 @@ temp.melt = temp.melt %>% mutate(date = year + 1859 + (1/month))
 
 # rename levels of species variable so easier to identify species
 agb.pft.melt$species = as.factor(agb.pft.melt$species)
-agb.pft.melt$species = plyr::mapvalues(agb.pft.melt$species, from = c(1,2,3,4), to = c('red maple', 'yellow birch', 'american beech', 'red oak'))
+agb.pft.melt$species = plyr::mapvalues(agb.pft.melt$species, from = c(1,2,3,4), to = c('red maple', 'red spruce','white pine','red oak'))
 
 # plot 
 library(ggplot2)

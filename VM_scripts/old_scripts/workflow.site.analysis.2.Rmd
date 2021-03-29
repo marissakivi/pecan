@@ -1,0 +1,688 @@
+---
+title: "Single Site Short Run SDA Analysis"
+author: "Marissa Kivi"
+date: "3/23/2020"
+output: html_document
+---
+
+# inputs: 
+# parameter values for ensembles 
+# annual ensemble weights 
+# adjusted stand- and PFT-level growth 
+# birth and death rates for all years of all ensembles
+
+The following script completes a short general analysis of a single-site SDA run. It identifies the species parameters and environmental variables that are most significant to adjusted relative stand- and PFT-level growth. It also considers temporal gaps in LINKAGES forecasts. 
+  
+```{R, echo = FALSE, include = FALSE}
+rm(list=ls())
+library(mvtnorm)
+library(PEcAn.workflow)
+library(PEcAn.settings)
+library(ggplot2)
+library(gridExtra)
+library(boot)
+library(reshape2)
+library(dplyr)
+library(class)
+library(GGally)
+library(e1071)
+library(randomForest)
+
+# if you want to rerun data-collecting script no matter what 
+overwrite = FALSE
+
+# edit these variables according to your run/preferences
+id = 14000000233
+site = "RH" # I just use initials here; no spaces as they will be column names 
+obs.list.loc = paste0('/data/dbfiles/sda.obs.ROOSTER.Rdata')
+```
+
+# Gather site data 
+```{R, echo = FALSE, include = FALSE}
+
+if (!file.exists(paste0('/save/workflows/PEcAn_',toString(id),'/analysis.Rdata')) | overwrite){
+  source('~/VM_scripts/gather.sda.data.R') 
+  load(obs.list.loc)
+  data = gather_sda_data(id=id, obs.list=obs.list, init=site)
+  save(data, obs.list, file = paste0('/save/workflows/PEcAn_',toString(id),'/analysis.Rdata'))
+  rm(dump.log, obs.list.loc, gather_sda_data)
+}else{
+  load(paste0('/save/workflows/PEcAn_',toString(id),'/analysis.Rdata'))
+}
+
+```
+
+# Further organize data for easy analysis
+```{R, echo = FALSE, include = FALSE}
+
+# Preliminary organization
+# Organize average wts of ensembles 
+avg.wts = data$weight.melt %>% group_by(ensemble) %>% summarize(wt = mean(weight))
+#pars = unique(data$param.melt$p.name)
+spp = data$spp
+
+# Step 1 and 2: Parameter vs. adjusted stand growth 
+#param.cast = left_join(data$param.melt, avg.wts, by = 'ensemble') %>%
+#  left_join(data$growth.melt %>% group_by(ensemble) %>% summarize(total = mean(adj.total)), by = 'ensemble') %>%
+#  left_join(dcast(data$life.melt %>% 
+#                    dplyr::select(-site, -birth, -death, -growth) %>% 
+#                    group_by(ensemble, species) %>% 
+#                    summarize(growth = mean(adj.growth)),
+#                    ensemble ~ species, value.var = 'growth'), 
+#            by = 'ensemble')
+
+# Step 1 and 2: Average life processes at PFT level
+#life.avg = data$life.melt %>% 
+#  dplyr::select(-site) %>%
+#  group_by(ensemble, species) %>%
+#  summarize(birth = mean(birth), growth = mean(adj.growth), death = mean(death))
+  
+# Step 3: Total and PFT-level biases over time
+#bias.melt = data$bias.melt
+
+```
+
+# Step 1: Species parameters vs. adjusted relative stand-level growth :: multiple linear regression 
+
+```{R, echo = FALSE, include = FALSE}
+# organize predictors 
+# remove B2 because it correlates perfectly with B3, so only need to keep one
+param.mat = dcast(data$param.melt %>% filter(p.name != 'B2'), ensemble ~ p.name + species, value.var = 'p.value')
+del = c()
+for (par in 2:dim(param.mat)[2]){
+ if (sd(param.mat[,par]) == 0) del = c(del, par)
+}
+param.mat = param.mat[,-del] %>% 
+  left_join(data$growth.melt %>% group_by(ensemble) %>% summarize(growth = mean(adj.total)), by = 'ensemble') %>% 
+  left_join(data$weight.melt %>% group_by(ensemble) %>% summarize(wt = mean(weight)), by = 'ensemble')
+
+# scaled predictors to determine standardized coefficients
+param.mat.scaled = as.data.frame(scale(param.mat %>% dplyr::select(-wt, -ensemble)))
+param.mat.scaled$wt = param.mat$wt
+
+# fit full model containing all individual predictors and interactions
+params.full = names(param.mat)[which(!(names(param.mat) %in% c('ensemble','wt','growth')))]
+terms.full = params.full
+for (p1 in 1:(length(params.full)-1)){
+  for (p2 in (p1+1):(length(params.full))){
+    terms.full = c(terms.full, paste0(params.full[p1],'*',params.full[p2]))
+  }
+}
+full.eq = paste0('growth~',paste(terms.full,collapse='+'))
+mod.full = lm(as.formula(full.eq), data = param.mat.scaled, weights = param.mat.scaled$wt)
+
+# perform forward stepwise model selection using BIC
+mod.null = lm(growth~1, data = param.mat.scaled, weights = param.mat.scaled$wt)
+n = length(param.mat.scaled$wt)
+forward.step.BIC = step(mod.null, k = log(n), direction="both",scope=list(upper=mod.full,lower=mod.null))
+
+# extract reduced model terms
+terms.reduced = rownames(coef(summary(forward.step.BIC)))[-1]
+param.reduced = unlist(
+  lapply(terms.reduced, 
+         function(x){
+           # if interaction term, need to separate
+           if (grepl(':',x)){
+             unlist(strsplit(x, ":"))
+             }else{
+               x
+               }
+           }))
+param.reduced = c(param.reduced, 'growth')
+slopes.reduced = coef(summary(forward.step.BIC))[-1,1]
+
+# make into a dataframe for easier sorting
+type = rep('single',length(terms.reduced))
+type[grep(':', terms.reduced)] = 'inter'
+parname1 = vector()
+parname2 = vector()
+for (v in seq_along(terms.reduced)){
+  term = terms.reduced[v]
+  terms = strsplit(term,':')
+  parname1[v] = terms[[1]][1]
+  parname2[v] = ifelse(is.na(terms[[1]][2]), NA, terms[[1]][2])
+}
+to_save = data.frame(slope = slopes.reduced, parname1 = parname1,
+                     parname2 = parname2, type = type, relation = rep('total',length(slopes.reduced)),
+                     stringsAsFactors = FALSE) %>% arrange(type,desc(abs(slope)))
+```
+
+# B: Plot reduced individual model predictors
+
+```{R, echo = FALSE}
+# check to make sure there are predictors
+if (length(terms.reduced)==0) next
+
+# get data 
+data.plot = param.mat %>% dplyr::select(growth, param.reduced, wt)
+
+# the following breaks up the predicted growth into four bins to make plotting cleaner as there are only four colors instead of a spectrum of color
+y.min = min(data.plot$growth)
+y.max = max(data.plot$growth)
+breaks = c(y.min-0.1,quantile(data.plot$growth, c(0.025,0.5,0.975)), y.max+0.1)
+data.plot$breaks = as.factor(.bincode(data.plot$growth,breaks, TRUE))
+
+# plot individual sig predictors vs. growth 
+single.terms = to_save %>% filter(type=='single') %>% dplyr::select(-parname2)
+if (length(single.terms$slope) > 0){
+  
+  for (p in seq_along(single.terms$slope)){
+    
+      var.plot = single.terms$parname1[p]
+      importance = single.terms$slope[p]
+      
+      mod.fit = lm(as.formula(paste0('growth~',var.plot)), data = data.plot, weights = data.plot$wt)
+      coefs = coef(summary(mod.fit))[,1]
+      
+      pl = ggplot(data.plot, aes_string(x=var.plot,y='growth'), col = 'darkgreen') + 
+        geom_point(aes(color = wt)) + 
+        geom_abline(slope = coefs[2], intercept = coefs[1]) + 
+        labs(x = var.plot, 
+             y = 'adjusted avg growth', 
+             title = paste(var.plot,'::', round(importance, 3))) 
+      print(corr(cbind(data.plot[[var.plot]],data.plot$growth), w = data.plot$wt))
+      print(pl)
+  }
+}
+```
+
+# C. Plot reduced model interaction terms 
+
+```{R, echo = FALSE, warnings = FALSE}
+# plot interaction terms 
+inter.terms = to_save %>% filter(type == 'inter')
+if (length(inter.terms$slope) > 0){
+  
+  for (p in seq_along(inter.terms$slope)){
+    var1.plot = inter.terms$parname1[p]
+    var2.plot = inter.terms$parname2[p]
+    importance = inter.terms$slope[p]
+    
+    pl = ggplot() +
+      geom_point(data = data.plot, aes_string(x=var1.plot,y=var2.plot)) +
+      #geom_point(data = (data.plot %>% filter(breaks == 4)), aes_string(x=var1.plot,y=var2.plot), color = 'blue') + 
+      #geom_point(data = (data.plot %>% filter(breaks == 1)), aes_string(x=var1.plot,y=var2.plot), color = 'orange') + 
+      geom_point(data = data.plot, aes_string(x=var1.plot, y=var2.plot, color='breaks')) +
+      labs(x=var1.plot, y=var2.plot, 
+           title = paste('Interaction Terms (',round(importance,3),')')) #+ 
+      #scale_color_manual(values = c('1'='yellow','2'='orange','3'='red','4'='purple'))
+      #scale_color_manual(values = c('Highest Growth'='Purple','Lowest Growth'='Orange'))
+    print(pl)
+  }
+}
+```
+
+# Step 2: Species parameters vs. adjusted pft-level growth :: multiple linear regression
+
+```{R, echo = FALSE, include = FALSE}
+
+for (s in seq_along(spp)){
+  
+  # organize data
+  sp = spp[s]
+  growth.mat = left_join(data$growth.melt, 
+                         data$life.melt %>% filter(species == sp) %>% dplyr::select(ensemble,year,species,adj.growth), 
+                         by = c('ensemble','year')) %>% 
+    group_by(ensemble) %>%
+    summarize(growth = mean(adj.growth))
+  param.mat.pft = param.mat %>% select(-growth) %>% 
+    left_join(growth.mat, by = c('ensemble'))
+  
+  # refit model with scaled predictors to determine standardized coefficients
+  param.mat.pft.scaled = as.data.frame(scale(param.mat.pft %>% select(-wt, -ensemble)))
+  param.mat.pft.scaled$wt = param.mat.pft$wt
+    
+  # fit full model containing all individual predictors and interactions
+  mod.full = lm(as.formula(full.eq), data = param.mat.pft.scaled, weights = param.mat.pft.scaled$wt)
+
+  # perform forward stepwise model selection using BIC
+  mod.null = lm(growth~1, data = param.mat.pft.scaled, weights = param.mat.pft.scaled$wt)
+  n = length(param.mat.pft.scaled$wt)
+  forward.step.BIC = step(mod.null, k = log(n), direction="both",scope=list(upper=mod.full,lower=mod.null))
+
+  # extract reduced model terms
+  terms.reduced = rownames(coef(summary(forward.step.BIC)))[-1]
+  param.reduced = unlist(
+    lapply(terms.reduced, 
+           function(x){
+             # if interaction term, need to separate
+             if (grepl(':',x)){
+               unlist(strsplit(x, ":"))
+               }else{
+                 x
+                 }
+             }))
+  param.reduced = c(param.reduced, 'growth')
+  slopes.reduced = coef(summary(forward.step.BIC))[-1,1]
+
+  # make into a dataframe for easier sorting
+  type = rep('single',length(terms.reduced))
+  type[grep(':', terms.reduced)] = 'inter'
+  parname1 = vector()
+  parname2 = vector()
+  for (v in seq_along(terms.reduced)){
+    term = terms.reduced[v]
+    terms = strsplit(term,':')
+    parname1[v] = terms[[1]][1]
+    parname2[v] = ifelse(is.na(terms[[1]][2]), NA, terms[[1]][2])
+  }
+  
+  to_save_pft = data.frame(slope = slopes.reduced, parname1 = parname1,
+                     parname2 = parname2, type = type, relation = rep(s,length(slopes.reduced)),
+                     stringsAsFactors = FALSE) %>% arrange(type,desc(abs(slope)))
+  
+  to_save = rbind(to_save,to_save_pft)
+}
+```
+
+## Comparing identified parameters to life processes 
+
+```{R, echo = FALSE, messages = FALSE, warnings = FALSE, include = FALSE}
+
+# Organizing life process data 
+life.avg = data$life.melt %>% 
+  group_by(ensemble, species) %>%
+  summarize(birth = mean(birth, na.rm = TRUE), death = mean(death, na.rm = TRUE))
+
+birth.mat = dcast(life.avg, ensemble ~ species, value.var = 'birth') 
+death.mat = dcast(life.avg, ensemble ~ species, value.var = 'death')
+
+iter.inds = which(to_save$type == 'single')
+columns = c(paste0(spp,'.birth'), paste0(spp,'.death'))
+to_add = matrix(NA,length(to_save$slope), length(columns))
+colnames(to_add) = columns
+
+for (i in iter.inds){
+  
+  # get parameter name + data
+  par.now = to_save$parname1[i]
+  
+  # loop through birth
+  c = 1 
+  for (b in 1:length(spp)){
+    spp.now = spp[b]
+    compare.data = left_join(param.mat, birth.mat, by = c('ensemble'))
+    par.data = compare.data[[par.now]]
+    birth.data = compare.data[[spp.now]]
+    wts.data = compare.data[['wt']]
+    
+    cor.now = corr(cbind(par.data, birth.data), w = wts.data) 
+    if (abs(cor.now) >= 0.2) to_add[i,c] = cor.now
+    c = c + 1
+  }
+  
+  # loop through death
+  for (d in 1:length(spp)){
+    spp.now = spp[d]
+    compare.data = left_join(param.mat, death.mat, by = c('ensemble'))
+    par.data = compare.data[[par.now]]
+    death.data = compare.data[[spp.now]]
+    wts.data = compare.data[['wt']]
+    
+    cor.now = corr(cbind(par.data, death.data), w = wts.data) 
+    if (abs(cor.now) >= 0.2) to_add[i,c] = cor.now
+    c = c + 1
+  }
+}
+
+to_save = cbind(to_save, to_add)
+
+```
+
+# Step 3: Tracking limiting growth factors of species over time 
+
+```{R, echo = FALSE, messages = TRUE, warnings = FALSE, include = FALSE}
+
+lgf.num.inds = left_join(data$gf.mat %>% group_by(ens, species, year, ind) %>% summarize(num = n()),
+                     data$gf.mat %>% group_by(ens, species, year) %>% summarize(ntree = n()), 
+                     by = c("species","ens","year")) %>% mutate(frac = num/ntree) %>%
+  left_join(avg.wts %>% mutate(ens = ensemble) %>% dplyr::select(-ensemble), by = c('ens')) %>% 
+  group_by(species, year, ind) %>% 
+  summarize(avg.frac = weighted.mean(frac, wt), 
+            avg.num = weighted.mean(num, wt), 
+            avg.ntree = weighted.mean(ntree, wt))
+lgf.num.inds$species = plyr::mapvalues(lgf.num.inds$species, from = c(1:length(spp)), to = spp)
+lgf.num.inds$ind = plyr::mapvalues(lgf.num.inds$ind, 
+                                   from = c(1:4), 
+                                   to = c('available light', 'soil moisture', 'soil nitrogen', 'growing-degree days'))
+
+lgf.num.inds %>% group_by(species, ind) %>% summarize(count = sum(avg.num)) %>% 
+  ggplot() + 
+  geom_col(aes(x = as.factor(species), y = count, fill = as.factor(ind)))
+
+pl = ggplot(lgf.num.inds) + 
+  geom_histogram(aes(x = year, fill = as.factor(ind), weight = avg.num), binwidth = 1) + 
+  facet_wrap(~species) + 
+  labs(title = 'average number of individuals limited by each growth factor',
+         x = 'year', y = 'average number of individuals', fill = 'growth factor') + 
+  scale_fill_manual(values = c("available light" = "gold",
+                               "soil moisture" = "blue",
+                               "soil nitrogen" = "brown",
+                               "growing-degree days" = "forestgreen"))
+print(pl)
+
+```
+
+# Step 4: Identification of environmental drivers of adjusted stand-level growth :: multiple linear regression
+
+```{R, echo = FALSE, messages = TRUE, warnings = FALSE, include = FALSE}
+
+# create save data frame 
+to_save_env = data.frame(year = NA, slope = NA, varname1 = NA, type = NA, 
+                         stringsAsFactors = FALSE) 
+
+yrs = unique(data$run.list[[1]]$year)
+
+# MK: this needs to be adjusted
+data.full = data$run.list[[1]] %>%
+    dplyr::select(-pred, -adj, -bias, -contrib, -avln, -kurt.dbh, -skew.dbh) %>%
+    mutate(ensemble = ens) %>% 
+    select(-ens) %>%
+    left_join(data$growth.melt %>% 
+                select(ensemble,year,adj.total) %>% 
+                mutate(year = year - 1 + min(data$run.list[[1]]$year)), 
+              by = c('ensemble','year'))
+vars.full = names(data.full)[which(!(names(data.full) %in% c('year','weight','ensemble','adj.total')))]
+
+# set up full model for year
+terms.full = vars.full 
+eq.full = paste0('adj.total~',paste(terms.full, collapse='+'))
+
+for (y in yrs){
+  
+  # gather data
+  data.now = data.full %>% filter(year == y)
+
+  # check for lop-sided weights
+  cumwts = cumsum(sort(data.now$weight, decreasing = TRUE))
+  #if (which(cumwts > 0.999999999)[1] <= 30) next
+  
+  # standardize data 
+  data.now.scaled = as.data.frame(scale(data.now %>% select(-year,-weight,-ensemble)))
+  data.now.scaled$weight = data.now$weight
+
+  # run forward model selection
+  mod.full = lm(as.formula(eq.full), data = data.now.scaled)
+  mod.null = lm(adj.total~1, data = data.now.scaled)
+  #mod.full = lm(as.formula(eq.full), data = data.now.scaled, weights = data.now.scaled$weight)
+  #mod.null = lm(adj.total~1, data = data.now.scaled, weights = data.now.scaled$weight)
+  n = length(data.now.scaled$weight)
+  forward.step.BIC = step(mod.null, k = log(n), direction="both",scope=list(upper=mod.full,lower=mod.null))
+  if (length(coef(forward.step.BIC)) > 2){
+    vifs = car::vif(forward.step.BIC)
+    if (any(vifs > 10)) break
+  }
+
+  # check for null model 
+  if (length(rownames(coef(summary(forward.step.BIC)))[-1]) == 0) next
+  
+  # extract reduced model terms 
+  param.reduced = rownames(coef(summary(forward.step.BIC)))[-1]
+  param.reduced = c(param.reduced, 'adj.total')
+  slopes.reduced = coef(summary(forward.step.BIC))[-1,1]
+
+  # make into a dataframe for easier sorting
+  type = rep('single',length(param.reduced)-1)
+  varname1 = param.reduced[-length(param.reduced)]
+  
+  # add to save data frame
+  to_save_env = rbind(to_save_env, 
+                      data.frame(
+                        year = rep(y, length(slopes.reduced)),
+                        slope = slopes.reduced, 
+                        varname1 = varname1,
+                        type = type,
+                        stringsAsFactors = FALSE))
+}
+
+to_save_env = to_save_env[-1,]
+rownames(to_save_env) = NULL
+```
+
+# B. Looking at environmental drivers through time 
+
+```{R, echo = FALSE}
+var.colors = c('salmon','slateblue','dodgerblue1','skyblue2', "palegreen1", "gray", "goldenrod1")
+names(var.colors) = vars.full
+
+data.bias = data$bias.melt %>% 
+  mutate(year = year - 1 + min(yrs)) %>% group_by(year) %>% 
+  summarize(mean.bias = mean(bias), bias05 = quantile(bias, 0.05), bias95 = quantile(bias,0.95))
+
+sing.terms = to_save_env %>% filter(type == 'single')
+
+ggplot() +
+  #geom_ribbon(data = data.bias, aes(x = year, ymin = bias05, ymax = bias95)) + 
+  geom_histogram(data=sing.terms, aes(x = year, weight = slope, fill = varname1), binwidth = 1) + 
+  #facet_wrap(~varname1) +
+  scale_fill_manual(values = var.colors, name = 'driver') + 
+  labs(x = 'year', y = 'standardized coefficient', title = 'Environmental Drivers over Time')   
+
+ggplot() +
+  #geom_ribbon(data = data.bias, aes(x = year, ymin = bias05, ymax = bias95)) + 
+  geom_histogram(data=sing.terms, aes(x = year, weight = slope, fill = varname1), binwidth = 1) + 
+  facet_wrap(~varname1) +
+  scale_fill_manual(values = var.colors) + 
+  labs(x = 'year', y = 'standardized coefficient', title = 'Environmental Drivers over Time') + 
+  theme(legend.position = 'none')
+
+```
+
+## Comparing identified drivers to life processes 
+
+```{R, echo = FALSE, messages = FALSE, warnings = FALSE, include = FALSE}
+
+# Organizing life process data 
+life.all = data$life.melt %>% 
+  mutate(year = year - 1 + min(data.full$year))
+
+effects.df = data.frame(year = NA, varname = NA, slope = NA, species = NA, process = NA, cor = NA)
+
+for (i in seq_along(to_save_env$slope)){
+  
+  # get parameter name + data
+  var.now = to_save_env$varname1[i]
+  yr.now = to_save_env$year[i]
+  
+  # loop through birth
+  for (b in 1:length(spp)){
+    spp.now = spp[b]
+    compare.data = left_join(data.full %>% filter(year == yr.now),
+                             life.all %>% filter(year == yr.now, species == spp.now),
+                             by = c('ensemble'))
+    var.data = compare.data[[var.now]]
+    birth.data = compare.data$birth
+    wts.data = compare.data[['weight']]
+    
+    cor.now = corr(cbind(var.data, birth.data), w = wts.data) 
+    if (abs(cor.now) >= 0.3){
+      to_add = data.frame(year = yr.now, varname = var.now, slope = to_save_env$slope[i], 
+                          species = spp.now, process = 'birth', cor = cor.now, stringsAsFactors = FALSE)
+      effects.df = rbind(effects.df, to_add)
+    }
+  }
+  
+  # loop through death
+  for (d in 1:length(spp)){
+    spp.now = spp[d]
+    compare.data = left_join(data.full %>% filter(year == yr.now),
+                             life.all %>% filter(year == yr.now, species == spp.now),
+                             by = c('ensemble'))
+    var.data = compare.data[[var.now]]
+    death.data = compare.data$death
+    wts.data = compare.data[['weight']]
+    
+    if (any(is.na(death.data))) death.data[is.na(death.data)] = 0
+    
+    cor.now = corr(cbind(var.data, death.data), w = wts.data) 
+    if (abs(cor.now) >= 0.3){
+      to_add = data.frame(year = yr.now, varname = var.now, slope = to_save_env$slope[i], 
+                          species = spp.now, process = 'death', cor = cor.now, stringsAsFactors = FALSE)
+      effects.df = rbind(effects.df, to_add)
+    }
+  }
+}
+
+effects.df = effects.df[-1,]
+
+```
+
+## Plotting effects on birth rates
+
+```{R, echo = FALSE}
+
+spec.colors = c('blue','yellow','green','red','purple')
+names(spec.colors) = spp
+
+data.plot = effects.df %>% filter(process == 'birth')
+pl = ggplot(data.plot) + 
+  geom_col(aes(x = year, y = cor, fill = as.factor(species))) + 
+  facet_wrap(~varname) + 
+  scale_fill_manual(values = spec.colors) + 
+  labs(x = 'year', y = 'correlation', title = 'effect of important environmental drivers on birth',
+       fill = 'species')
+pl
+    
+```
+
+## Plotting effects on death rates
+
+```{R, echo = FALSE}
+
+spec.colors = c('blue','yellow','green','red','purple')
+names(spec.colors) = spp
+
+data.plot = effects.df %>% filter(process == 'death')
+pl = ggplot(data.plot) + 
+  geom_col(aes(x = year, y = cor, fill = as.factor(species))) + 
+  facet_wrap(~varname) + 
+  scale_fill_manual(values = spec.colors) + 
+  labs(x = 'year', y = 'correlation', title = 'effect of important environmental drivers on death',
+       fill = 'species')
+pl
+    
+```
+
+# Step 4: Identification of environmental drivers of adjusted PFT-level growth over time :: multiple linear regression
+
+```{R, echo = FALSE, messages = FALSE, warnings = FALSE, include = FALSE}
+
+# create save data frame 
+to_save_env_pft = data.frame(year = NA, slope = NA, varname1 = NA, type = NA, pft = NA, 
+                         stringsAsFactors = FALSE) 
+
+for (s in seq_along(spp)){
+  
+  # gather data for species
+  data.full = data$run.list[[s]] %>%
+    dplyr::select(-pred, -bias, -skew.diam, -kurt.diam, -avln, -kurt.dbh, -skew.dbh) %>%
+    mutate(ensemble = ens) %>% 
+    dplyr::select(-ens)
+
+  # set up full model for year
+  vars.full = names(data.full)[which(!(names(data.full) %in% c('year','adj','weight','ensemble')))]
+  terms.full = vars.full 
+  eq.full = paste0('adj~',paste(terms.full, collapse='+'))
+
+  for (y in yrs){
+  
+    # gather data for year 
+    data.now = data.full %>% filter(year == y)
+
+    # check for lop-sided weights
+    cumwts = cumsum(sort(data.now$weight, decreasing = TRUE))
+    if (which(cumwts > 0.999999999)[1] <= 20) next 
+    
+    # refit model with scaled predictors to determine standardized coefficients
+    data.now.scaled = as.data.frame(scale(data.now %>% select(-ensemble, -year, -weight)))
+    data.now.scaled$weight = data.now$weight
+    
+    # run forward model selection
+    mod.full = lm(as.formula(eq.full), data = data.now, weights = data.now$weight)
+    mod.null = lm(adj~1, data = data.now, weights = data.now$weight)
+    n = length(data.now$weight)
+    forward.step.BIC = step(mod.null, k = log(n), direction="both",scope=list(upper=mod.full,lower=mod.null))
+
+    # check for null model 
+    if (length(rownames(coef(summary(forward.step.BIC)))[-1]) == 0) next
+  
+      # extract reduced model terms 
+    terms.reduced = rownames(coef(summary(forward.step.BIC)))[-1]
+    param.reduced = terms.reduced
+    param.reduced = c(param.reduced, 'adj')
+    slopes.reduced = coef(summary(forward.step.BIC))[-1,1]
+
+    # make into a dataframe for easier sorting
+    type = rep('single',length(terms.reduced))
+    varname1 = terms.reduced
+  
+    # add to save data frame
+    to_save_env_pft = rbind(to_save_env_pft, 
+                        data.frame(
+                          year = rep(y, length(slopes.reduced)),
+                          slope = slopes.reduced, 
+                          varname1 = varname1,
+                          type = type,
+                          pft = rep(spp[s], length(slopes.reduced)),
+                          stringsAsFactors = FALSE))
+  }
+}
+
+to_save_env_pft = to_save_env_pft[-1,]
+rownames(to_save_env_pft) = NULL
+```
+
+# B. Looking at environmental drivers through time 
+
+```{R, echo = FALSE}
+
+var.colors = c('salmon','slateblue','dodgerblue1','skyblue2', "palegreen1", "gray", "goldenrod1")
+names(var.colors) = vars.full
+
+nyrs = length(unique(to_save_env_pft$year))
+
+for (s in seq_along(spp)){
+  
+  df.now = to_save_env_pft %>% filter(pft == spp[s], type == 'single')
+  
+  pl = ggplot() + 
+    geom_histogram(data = df.now, aes(x = year, weight = slope, fill = varname1), binwidth = 1) + 
+    scale_fill_manual(values = var.colors, name = 'driver') +
+    labs(x = 'year', y = 'standardized coefficient', title = paste(spp[s],': environmental drivers over time')) 
+  print(pl)
+  
+}
+
+ggplot() + 
+  geom_bar(data = to_save_env_pft %>% filter(type == 'single'), 
+           aes(x = as.factor(pft), fill = as.factor(varname1)), position = 'dodge') + 
+  scale_fill_manual(values = var.colors) + 
+  labs(x = 'pft', y = 'importance', fill = 'driver',
+       title = paste0('driver appearances over ',nyrs, ' years'))
+
+ggplot() + 
+  geom_col(data = to_save_env_pft %>% 
+             filter(type == 'single') %>% 
+             group_by(pft, varname1) %>%
+             summarize(import = mean(slope)), 
+           aes(x = as.factor(varname1),y = import, fill = as.factor(varname1)), position = 'dodge') + 
+  scale_fill_manual(values = var.colors) + 
+  labs(x = element_blank(), y = 'importance', 
+       fill = 'driver', title = 'average slope over time') + 
+  facet_wrap(~pft) + 
+  theme(axis.ticks = element_blank(), 
+        axis.text.x = element_blank())
+
+```
+
+## A. Total model bias over time
+
+```{R, echo = FALSE}
+
+data$bias.melt %>% 
+  ggplot(aes(x = year + 1960, y = bias, col = ensemble, group = ensemble)) +
+  ylim(-1,1) +
+  geom_line(show.legend = FALSE) + 
+  labs(title = 'model error over time', x = 'year', y = 'relative model bias')
+
+```

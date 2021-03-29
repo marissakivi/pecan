@@ -1,0 +1,444 @@
+---
+title: "Single Site Short Run SDA Analysis"
+author: "Marissa Kivi"
+date: "3/23/2020"
+output: html_document
+---
+
+# inputs: 
+# parameter values for ensembles 
+# adjusted stand- and PFT-level growth 
+# birth and death rates for all years of all ensembles
+
+The following script completes a short general analysis of a single SDA run. It considers the species parameters which are most important to total stand productivity, as well as to PFT-level productivity. Then, it creates a few plots, which allow us to consider model bias over time so we can identify time periods where LINKAGES consistently struggles both at the stand- and PFT-level. 
+  
+```{R, echo = FALSE, include = FALSE}
+rm(list=ls())
+library(mvtnorm)
+library(PEcAn.workflow)
+library(PEcAn.settings)
+library(ggplot2)
+library(gridExtra)
+library(boot)
+library(reshape2)
+library(dplyr)
+library(class)
+library(GGally)
+library(randomForest)
+
+# if you want to rerun data-collecting script no matter what 
+overwrite = FALSE
+
+# edit these variables according to your run/preferences
+id = 14000000145
+disturbance.yrs = c(1920, 1938)
+site = "HF" # I just use initials here; no spaces as they will be column names 
+obs.list.loc = paste0('/data/dbfiles/sda.obs.HARVARD.Rdata')
+
+min.cor = 0.25
+```
+
+# Gather site data 
+```{R, echo = FALSE, include = FALSE}
+
+if (!file.exists(paste0('/data/workflows/PEcAn_',toString(id),'/analysis.Rdata')) | overwrite){
+  source('~/VM_scripts/gather.sda.data.R') 
+  load(obs.list.loc)
+  data = gather_sda_data(id=id, obs.list=obs.list, disturbance.yrs=disturbance.yrs, init=site)
+  save(data, obs.list, file = paste0('/data/workflows/PEcAn_',toString(id),'/analysis.Rdata'))
+  rm(dump.log, obs.list.loc, gather_sda_data)
+}else{
+  load(paste0('/data/workflows/PEcAn_',toString(id),'/analysis.Rdata'))
+}
+
+```
+
+# Further organize data for easy analysis
+```{R, echo = FALSE, include = FALSE}
+
+# Preliminary organization
+# Organize average wts of ensembles 
+avg.wts = data$weight.melt %>% group_by(ensemble) %>% summarize(wt = mean(weight))
+pars = unique(data$param.melt$p.name)
+spp = data$spp
+
+# Step 1 and 2: Parameter vs. adjusted stand growth 
+param.cast = left_join(data$param.melt, avg.wts, by = 'ensemble') %>%
+  left_join(data$growth.melt %>% group_by(ensemble) %>% summarize(total = mean(adj.total)), by = 'ensemble') %>%
+  left_join(dcast(data$life.melt %>% 
+                    dplyr::select(-site, -birth, -death, -growth) %>% 
+                    group_by(ensemble, species) %>% 
+                    summarize(growth = mean(adj.growth)),
+                    ensemble ~ species, value.var = 'growth'), 
+            by = 'ensemble')
+
+# Step 1 and 2: Average life processes at PFT level
+life.avg = data$life.melt %>% 
+  dplyr::select(-site) %>%
+  group_by(ensemble, species) %>%
+  summarize(birth = mean(birth), growth = mean(adj.growth), death = mean(death))
+  
+# Step 3: Total and PFT-level biases over time
+bias.melt = data$bias.melt
+
+# Step 3 and 4: 
+```
+
+# Step 1: Species parameters vs. adjusted relative stand-level growth
+
+```{R, echo = FALSE}
+
+# iterate through all species and all parameters and compute weighted correlation
+for (s in seq_along(spp)){
+  for (p in seq_along(pars)){
+    
+    # compute weighted correlation
+    data.now = param.cast %>% filter(species == spp[s], p.name == pars[p]) %>% dplyr::select(p.value, total, wt, ensemble)
+    
+    # HACK
+    if (sd(data.now$p.value)==0) next
+    
+    wt.cor = corr(cbind(data.now$p.value,data.now$total), w = data.now$wt)
+    #print(wt.cor)
+    
+    # if weighted correlation meets minimum value, plot, print, and check life processes
+    if (abs(wt.cor) > min.cor){
+      
+      # print plot
+      pl = ggplot(data.now, aes(x=p.value, y=total)) + 
+        geom_point(aes(col=wt)) + 
+        geom_smooth(method='lm') +
+        labs(x=paste(spp[s],pars[p]), y='adjusted stand growth', col='weight')
+      print(pl)
+      
+      # print
+      print(paste(spp[s], pars[p], "::", wt.cor))
+      
+      # check against average life processes for speciess 
+      for (s2 in seq_along(spp)){
+        
+        life.data = life.avg %>% filter(species == spp[s2]) %>% left_join(data.now, by = 'ensemble')
+        wt.birth = corr(cbind(life.data$p.value, life.data$birth), w=life.data$wt)
+        wt.growth = corr(cbind(life.data$p.value, life.data$growth), w=life.data$wt)
+        wt.death = corr(cbind(life.data$p.value, life.data$death), w=life.data$wt)
+        
+        if (!is.na(wt.birth)){
+          if (abs(wt.birth) > min.cor) print(paste('>>',spp[s2],'birth ::', wt.birth))
+        }
+        if (!is.na(wt.growth)){
+          if (abs(wt.growth) > min.cor) print(paste('>>',spp[s2],'growth ::', wt.growth))
+        }
+        if (!is.na(wt.death)){
+          if (abs(wt.death) > min.cor) print(paste('>>',spp[s2],'death ::', wt.death))
+        }
+      }
+    }
+  }
+}
+```
+
+# Step 2: Species parameters vs. predicted pft-level growth 
+
+```{R, echo = FALSE}
+
+# iterate through all species and species parameters and compute weighted correlation
+for (s1 in seq_along(spp)){
+  for (s2 in seq_along(spp)){
+    for (p in seq_along(pars)){
+      
+      # compute weighted correlation
+      data.now = param.cast %>% 
+        filter(species == spp[s2], p.name == pars[p]) %>% 
+        dplyr::select(p.value, wt, ensemble, one_of(c(spp[s1])))
+    
+      # HACK
+      if (sd(data.now$p.value)==0 | any(is.na(data.now[[spp[s1]]]))) next
+
+      wt.cor = corr(cbind(data.now$p.value, data.now[[spp[s1]]]), w = data.now$wt)
+    
+      # if weighted correlation meets minimum value, plot, print, and check against life processes
+      if (abs(wt.cor) > min.cor){
+      
+        # print plot
+        pl = ggplot(data.now, aes_string(x='p.value', y=spp[s1])) + 
+          geom_point(aes(col=wt)) + 
+          geom_smooth(method='lm') +
+          labs(x=paste(spp[s2],pars[p]), y=paste('Adjusted Growth of',spp[s1]), col='weight')
+        print(pl)
+      
+        # print
+        print(paste(spp[s1],'growth vs',spp[s2], pars[p], "::", wt.cor))
+        
+        # check against average life processes for speciess 
+        for (s3 in seq_along(spp)){
+          life.data = life.avg %>% filter(species == spp[s3]) %>% left_join(data.now, by = 'ensemble')
+          wt.birth = corr(cbind(life.data$p.value, life.data$birth), w=life.data$wt)
+          wt.growth = corr(cbind(life.data$p.value, life.data$growth), w=life.data$wt)
+          wt.death = corr(cbind(life.data$p.value, life.data$death), w=life.data$wt)
+          
+          if (!is.na(wt.birth)){
+            if (abs(wt.birth) > min.cor) print(paste('>>',spp[s3],'birth ::', wt.birth))
+          }
+          if (!is.na(wt.growth) & (s1 != s3)){
+            if (abs(wt.growth) > min.cor) print(paste('>>',spp[s3],'growth ::', wt.growth))
+          }
+          if (!is.na(wt.death)){
+            if (abs(wt.death) > min.cor) print(paste('>>',spp[s3],'death ::', wt.death))
+          }
+        }
+      }
+    }
+  }
+}
+  
+```
+
+# Step 3: Identification of environmental drivers of adjusted stand-level growth
+
+```{R, echo = FALSE, messages = FALSE, warnings = FALSE}
+
+# gather data
+data.now = data$run.list[[1]] %>% select(-lat,-lon,-pred,-adj,-bias, -algf25, -algf50, -algf75, -sngf) %>%
+  mutate(ensemble = ens) %>% select(-ens) %>%
+  left_join(data$growth.melt %>% select(ensemble,year,adj.total) %>% mutate(year = year - 1 + min(data$run.list[[1]]$year)), by = c('ensemble','year'))
+
+data.now = left_join(data.now, data$bias.melt %>% mutate(year = year - 1 + min(data.now$year)), by = c('ensemble','year'))
+
+# select observations that are above a certain accuracy threshold 
+data.now = data.now %>% filter(abs(bias) < 0.025)
+
+# create data.trans which contains the transformed data matrix
+data.trans = data.now
+
+## ADJUST TRANSFORMATIONS HERE
+# adjust variables according to the relationships you see in the plots
+# scaling each of the predictors negates the effect of scale among the variables 
+data.trans$summer.temp = scale(data.trans$summer.temp)
+data.trans$winter.temp = scale(data.trans$winter.temp)
+data.trans$summer.precip = scale(log(data.trans$summer.precip))
+data.trans$winter.precip = scale(log(data.trans$winter.precip))
+data.trans$g.season = scale(data.trans$g.season)
+data.trans$basal.area = scale(data.trans$basal.area)
+data.trans$canopy1 = scale(log(data.trans$canopy1))
+data.trans$canopy2 = scale(log(data.trans$canopy2))
+data.trans$canopy3  = scale(log(data.trans$canopy3))
+data.trans$stand.age = scale(data.trans$stand.age)
+data.trans$disturb = scale(data.trans$disturb)
+
+# obtain response variable
+dat.resp = log(data.trans$adj.total - min(data.trans$adj.total) + 1)
+hist(dat.resp)
+vars = names(data.trans)[-c(1,2,14,15,16,17)]
+
+for (v in 1:length(vars)){
+  var = vars[v]
+  dat.var = as.matrix(data.trans %>% dplyr::select(var))
+  
+  # check to make sure it's worth plotting
+  if (var != 'dominant'){
+    if (sd(dat.var,na.rm=TRUE) == 0) next
+    if (length(unique(dat.var)) < 2) next
+  } 
+  
+  df = as.data.frame(cbind(dat.resp,dat.var))
+  colnames(df) = c('dat.y','dat.x')
+  lm.now = lm(dat.y~dat.x, data=df)
+  df$resid = lm.now$residuals
+  
+  pl.lin = ggplot(df) + 
+    geom_point(aes(x = dat.x, y = dat.y)) +
+    labs(title = paste(var,'vs. Adjusted Growth'), x = 'value', y = 'adjusted relative annual growth')
+  pl.var = ggplot(df) + 
+    geom_point(aes(x = dat.x, y = resid)) + 
+    labs(title = paste(var,'vs. Model Residual'), x = 'value', y = 'model residual')
+  pl.norm = ggplot(df) + 
+    geom_histogram(aes(x=dat.x)) + 
+    labs(title = paste(var,':: normality plot'), x = 'value', y = 'density')
+  
+  grid.arrange(pl.lin, pl.var, pl.norm, ncol = 2)
+}
+
+```
+
+## B. Perform multiple linear regression analysis to identify significant predictors and interaction terms for species-level annual growth
+
+```{R, echo = FALSE}
+
+data.trans = data.trans %>% dplyr::select(-year,-weight,-ensemble,-bias,-site) 
+data.trans$adj.total = dat.resp
+
+vars = names(data.trans) 
+sig.vars = c()
+sig.int = list()
+trk.int = 1
+
+# compile list of significant individual predictors 
+for (v in seq_along(vars)){
+  var = vars[v]
+  if (var == 'adj.total') next 
+  form = as.formula(paste0('adj.total~',var))
+  mod = lm(form, data = data.trans)
+  if (coef(summary(mod))[-1,4] < 0.01) sig.vars = c(sig.vars, var)
+}
+
+# compile list of significant interactions
+for (v1 in 1:(length(vars)-1)){
+  var1 = vars[v1]
+  if (var1 == 'adj.total') next
+  
+  for (v2 in (v1+1):length(vars)){
+    var2 = vars[v2] 
+    if (var2 == 'adj.total') next
+    if (var1 == var2) next
+    
+    form = as.formula(paste0('adj.total~',var1,'*',var2))
+    mod = lm(form, data = data.trans)
+    
+    # get interaction term values
+    term = grep(':',names(coef(summary(mod))[,1]))
+    if (length(term)==0) next
+     
+    if (coef(summary(mod))[term,4] < 0.01){
+      sig.int[[trk.int]] = c(var1,var2)
+      trk.int = trk.int+1
+    }
+  }
+}
+
+# add all identified variables/interactions to a large lm model for re-fitting
+# refit the model and only take ones that we have deemed to be important on their own
+sing.part = paste(sig.vars, collapse='+')
+inter.part = paste(sapply(sig.int, function(x){paste(x,collapse='*')}), collapse = '+')
+if (sing.part == '' & inter.part == '') next
+if (sing.part != '' & inter.part == '') eq = paste0('adj.total~',sing.part)
+if (sing.part == '' & inter.part != '') eq = paste0('adj.total~',inter.part)
+if (sing.part != '' & inter.part != '') eq = paste0('adj.total~',sing.part,'+',inter.part)
+
+# now we are interested in looking at which variables seem to be most important to predicting species productivity
+mod.full = lm(as.formula(eq), data.trans)
+mod.null = lm(adj.total~1, data.trans)
+n = length(data.trans$canopy1)
+
+# extract only coefficients that are found to be significantly non-zero; organize information in a data frame
+final_coefs = coef(summary(mod.full))[-1,]
+to_save = which(final_coefs[,4] < 0.01)
+to_save_coefs = final_coefs[to_save,1]
+to_save_vars = rownames(final_coefs[to_save,])
+
+# make into a dataframe for easier sorting
+type = rep('single',length(to_save_vars))
+type[grep(':', to_save_vars)] = 'inter'
+varname1 = vector()
+varname2 = vector()
+for (v in seq_along(to_save_vars)){
+  term = to_save_vars[v]
+  terms = strsplit(term,':')
+  varname1[v] = terms[[1]][1]
+  varname2[v] = ifelse(is.na(terms[[1]][2]), NA, terms[[1]][2])
+}
+to_save = data.frame(slope = to_save_coefs, varname1 = varname1,
+                     varname2 = varname2, type = type,
+                     stringsAsFactors = FALSE) %>% arrange(type,desc(abs(slope)))
+
+```
+
+## C. Generate plots for those single predictors that were found to be significantly non-zero
+
+The importance of each variable as a predictor of productivity is marked by the magnitude of its slope since the covariates were all standardized.  
+
+```{R, echo = FALSE, warnigs = FALSE}
+
+# check to make sure there are predictors
+if (length(to_save_vars)==0) next
+  
+# concatenate all needed predictors
+all.terms = unique(c(to_save$varname1,to_save$varname2))
+all.terms = all.terms[-c(which(is.na(all.terms)))]
+  
+# get data 
+data.plot = data.now %>% dplyr::select(adj.total, all.terms)
+
+# the following breaks up the predicted growth into four bins to make plotting cleaner as there are only four colors instead of a spectrum of color
+y.min = min(data.plot$adj.total)
+y.max = max(data.plot$adj.total)
+breaks = c(y.min-0.1,quantile(data.plot$adj.total, c(0.025,0.5,0.975)), y.max+0.1)
+data.plot$breaks = as.factor(.bincode(data.plot$adj.total,breaks, TRUE))
+  
+# plot individual sig predictors vs. growth 
+sig.terms = to_save %>% filter(type=='single') %>% 
+  dplyr::select(-varname2)
+
+if (length(sig.terms$slope) > 0){
+  
+  for (p in seq_along(sig.terms$slope)){
+    
+      var.plot = sig.terms$varname1[p]
+      importance = sig.terms$slope[p]
+      
+      pl = ggplot(data.plot, aes_string(x=var.plot,y='adj.total'), col = 'darkgreen') + 
+        geom_point() + 
+        geom_smooth(method='lm') + 
+        labs(x = var.plot, 
+             y = 'adjusted growth', 
+             title = paste(s,'(',round(importance,3),')'))
+      print(pl)
+  }
+}
+
+# plot parallel coordinates of single parameters
+if (length(sig.terms$slope) > 2){
+  print(ggparcoord(data = data.plot, columns = 2:(ncol(data.plot)-2), groupColumn = ncol(data.plot), title = paste('Parallel Coordinates ::',s)))
+}
+
+```
+
+## D. Generate plots for those interaction relationships that were found to be significantly non-zero
+
+The importance of each term as a predictor of productivity is marked by the magnitude of its slope. 
+
+```{R, echo = FALSE, warnigs = FALSE}
+  
+# plot interaction terms 
+inter.terms = to_save %>% filter(type == 'inter')
+if (length(inter.terms$slope) > 0){
+  
+  for (p in seq_along(inter.terms$slope)){
+    var1.plot = inter.terms$varname1[p]
+    var2.plot = inter.terms$varname2[p]
+    importance = inter.terms$slope[p]
+    
+    pl = ggplot() +
+      geom_point(data = data.plot, aes_string(x=var1.plot,y=var2.plot)) +
+      geom_point(data = (data.plot %>% filter(breaks == 4)), aes_string(x=var1.plot,y=var2.plot), color = 'blue') + 
+      geom_point(data = (data.plot %>% filter(breaks == 1)), aes_string(x=var1.plot,y=var2.plot), color = 'orange') + 
+      labs(x=var1.plot, y=var2.plot, 
+           title = paste(s,'(',round(importance,3),')')) #+ 
+      #scale_color_manual(values = c('1'='yellow','2'='orange','3'='red','4'='purple'))
+      #scale_color_manual(values = c('Highest Growth'='Purple','Lowest Growth'='Orange'))
+    print(pl)
+  }
+}
+
+```
+
+
+## A. Total model bias over time
+
+```{R, echo = FALSE}
+
+data$bias.melt %>% 
+  ggplot(aes(x = year + 1960, y = bias, col = ensemble, group = ensemble)) +
+  ylim(-1,1) +
+  geom_line(show.legend = FALSE) + 
+  labs(title = 'model error over time', x = 'year', y = 'relative model bias')
+
+#for (s in seq_along(spp)){
+#  print(bias.melt %>% 
+#          ggplot(aes(x = year + 1960, col = ensemble, group = ensemble)) + 
+#          ylim(-1,1) + 
+#          geom_line(aes_string(y = spp[s]), show.legend = FALSE) + 
+#          labs(title = paste(spp[s],':: model error over time'), x = 'year', y = 'relative model bias')
+#  )
+#}
+
+```

@@ -1,0 +1,437 @@
+---
+title: "Single Site Short Run SDA Analysis"
+author: "Marissa Kivi"
+date: "January 2021"
+output: html_document
+---
+
+The following script completes a short general analysis of a single-site SDA run. It identifies driving environmental variables to adjusted relative stand- and PFT-level increment. 
+It also considers temporal gaps in LINKAGES forecasts for the site. 
+  
+```{R, echo = FALSE, include = FALSE}
+rm(list=ls())
+library(mvtnorm)
+library(PEcAn.workflow)
+library(PEcAn.settings)
+library(ggplot2)
+library(gridExtra)
+library(boot)
+library(reshape2)
+library(dplyr)
+library(class)
+library(GGally)
+library(e1071)
+library(randomForest)
+
+# if you want to rerun data-collecting script no matter what 
+overwrite = FALSE
+
+# edit these variables according to your run/preferences
+id = 14000000233
+site = "RH" # I just use initials here; no spaces as they will be column names 
+obs.list.loc = paste0('/data/dbfiles/sda.obs.ROOSTER.Rdata')
+first.year = 1960
+
+spec.colors = c('blue','pink','green','red')
+```
+
+# Gather site data 
+```{R, echo = FALSE, include = FALSE}
+if (!file.exists(paste0('/save/workflows/PEcAn_',toString(id),'/analysis.Rdata')) | overwrite){
+  source('~/VM_scripts/gather.sda.data.R') 
+  load(obs.list.loc)
+  data = gather_sda_data(id=id, obs.list=obs.list, init=site)
+  save(data, obs.list, file = paste0('/save/workflows/PEcAn_',toString(id),'/analysis.Rdata'))
+  rm(dump.log, obs.list.loc, gather_sda_data)
+}else{
+  load(paste0('/save/workflows/PEcAn_',toString(id),'/analysis.Rdata'))
+}
+```
+
+# Further organize data for easy analysis
+```{R, echo = FALSE, include = FALSE}
+
+# Preliminary organization
+# Organize average wts of ensembles 
+spp_title = sapply(data$spp, function(x){paste(strsplit(substr(x, 1, nchar(x)-2), split = '.', fixed = TRUE)[[1]], collapse = ' ')})
+spp = data$spp
+```
+
+# Analysis Part I: Stand-level environmental analysis
+
+# Environmental variables included: 
+# 1. summer temperature :: june - august
+# 2. summer precipitation :: june - august
+# 3. winter temperature :: january - april
+# 4. winter precipitation :: january - april 
+# 5. median diameter, diameter skewness, kurtosis diameter :: characteristics of stand structure for all individuals in stand
+# 6. contrib :: percent of individuals in stand contributing to the 50% of stand biomass
+# 7. available nitrogen :: available nitrogen according to LINKAGES
+# 8. gap :: average available light to trees at forest floor (height < 2.5 m) 
+
+# pred :: relative increment from previous adjusted value according to LINKAGES forecast
+# adj :: relative increment from previous adjusted value to new adjusted value 
+# bias :: relative error between adjusted and forecasted value 
+# weight :: yearly weight for ensemble predictions based on mvnorm with mu.a and Pa
+
+# First, let's look at limiting growth factors for species at this site. 
+
+```{R, echo = FALSE, include = FALSE}
+lgf.num.inds = left_join(data$gf.mat %>% group_by(ens, species, year, ind) %>% summarize(num = n()),
+                     data$gf.mat %>% group_by(ens, species, year) %>% summarize(ntree = n()), 
+                     by = c("species","ens","year")) %>% mutate(frac = num/ntree) %>%
+  left_join(data$weight.melt %>% mutate(ens = ensemble, year = year + first.year - 1) %>% dplyr::select(-ensemble), by = c('ens', 'year')) %>% 
+  group_by(species, year, ind) %>% 
+  summarize(avg.frac = weighted.mean(frac, weight), 
+            avg.num = weighted.mean(num, weight), 
+            avg.ntree = weighted.mean(ntree, weight))
+lgf.num.inds$species = plyr::mapvalues(lgf.num.inds$species, from = c(1:length(spp)), to = spp_title)
+lgf.num.inds$ind = plyr::mapvalues(lgf.num.inds$ind, 
+                                   from = c(1:4), 
+                                   to = c('available light', 'soil moisture', 'soil nitrogen', 'growing-degree days'))
+
+lgf.num.inds %>% group_by(species, ind) %>% summarize(count = sum(avg.num, na.rm = TRUE)) %>% 
+  ggplot() + 
+  geom_col(aes(x = as.factor(species), y = count, fill = as.factor(ind)))
+
+pl = ggplot(lgf.num.inds) + 
+  geom_histogram(aes(x = year, fill = as.factor(ind), weight = avg.num), binwidth = 1) + 
+  facet_wrap(~species) + 
+  labs(title = 'average number of individuals limited by each growth factor',
+         x = 'year', y = 'average number of individuals', fill = 'growth factor') + 
+  scale_fill_manual(values = c("available light" = "gold",
+                               "soil moisture" = "blue",
+                               "soil nitrogen" = "brown",
+                               "growing-degree days" = "forestgreen"))
+print(pl)
+```
+
+
+# Second, let's look at significant environmental factors for total stand biomass increment over time. 
+
+# A. Identify significant predictors each year using weighted multiple linear regression model and stepwise model selection
+
+```{R, echo = FALSE, messages = TRUE, warnings = FALSE, include = FALSE}
+# create save data frame 
+to_save_env = data.frame(year = NA, slope = NA, varname1 = NA, type = NA, 
+                         stringsAsFactors = FALSE) 
+
+# we can just take the first index of the list because the environmental values are unchanging across species 
+# we need to add the total stand biomass from data$growth.melt 
+yrs = unique(data$run.list[[1]]$year)
+data.full = data$run.list[[1]] %>%
+    dplyr::select(-pred, -adj, -bias) %>%
+    mutate(ensemble = ens) %>% 
+    select(-ens) %>%
+    left_join(data$growth.melt %>% 
+                select(ensemble,year,adj.total) %>% 
+                mutate(year = year - 1 + min(data$run.list[[1]]$year)), 
+              by = c('ensemble','year'))
+vars.full = names(data.full)[which(!(names(data.full) %in% c('year','weight','ensemble','adj.total')))]
+
+# set up full model for year
+terms.full = vars.full 
+eq.full = paste0('adj.total~',paste(terms.full, collapse='+'))
+
+for (y in yrs){
+  
+  # gather data
+  data.now = data.full %>% filter(year == y)
+
+  # check for lop-sided weights, we need a sample size of at least 30 
+  cumwts = cumsum(sort(data.now$weight, decreasing = TRUE))
+  if (which(cumwts > 0.999999999)[1] <= 30) next
+  
+  # standardize data 
+  data.now.scaled = as.data.frame(scale(data.now %>% select(-year,-weight,-ensemble)))
+  data.now.scaled$weight = data.now$weight
+
+  # run forward model selection
+  mod.full = lm(as.formula(eq.full), data = data.now.scaled, weights = data.now.scaled$weight)
+  mod.null = lm(adj.total~1, data = data.now.scaled, weights = data.now.scaled$weight)
+  n = length(data.now.scaled$weight)
+  forward.step.BIC = step(mod.null, k = log(n), direction="both",scope=list(upper=mod.full,lower=mod.null))
+  
+  # we need to check for collinearity
+  # MK: need to come up with a way to expose collinearity without breaking the code 
+  if (length(coef(forward.step.BIC)) > 2){
+    vifs = car::vif(forward.step.BIC)
+    #if (any(vifs > 10)) break
+  }
+
+  # check for null model 
+  if (length(rownames(coef(summary(forward.step.BIC)))[-1]) == 0) next
+  
+  # extract reduced model terms 
+  param.reduced = rownames(coef(summary(forward.step.BIC)))[-1]
+  param.reduced = c(param.reduced, 'adj.total')
+  slopes.reduced = coef(summary(forward.step.BIC))[-1,1]
+
+  # make into a dataframe for easier sorting
+  type = rep('single',length(param.reduced)-1)
+  varname1 = param.reduced[-length(param.reduced)]
+  
+  # add to save data frame
+  to_save_env = rbind(to_save_env, 
+                      data.frame(
+                        year = rep(y, length(slopes.reduced)),
+                        slope = slopes.reduced, 
+                        varname1 = varname1,
+                        type = type,
+                        stringsAsFactors = FALSE))
+}
+
+to_save_env = to_save_env[-1,]
+rownames(to_save_env) = NULL
+```
+
+# B. Looking at environmental drivers through time 
+
+```{R, echo = FALSE}
+var.colors = c('salmon','slateblue','dodgerblue1','skyblue2', 
+               'red','green','black',"palegreen1", "gray", "goldenrod1")
+names(var.colors) = vars.full
+
+#data.bias = data$bias.melt %>% 
+#  mutate(year = year - 1 + min(yrs)) %>% group_by(year) %>% 
+#  summarize(mean.bias = mean(bias), bias05 = quantile(bias, 0.05), bias95 = quantile(bias,0.95))
+
+sing.terms = to_save_env %>% filter(type == 'single')
+
+ ggplot() +
+  #geom_ribbon(data = data.bias, aes(x = year, ymin = bias05, ymax = bias95)) + 
+  geom_histogram(data=sing.terms, aes(x = year, weight = slope, fill = varname1), binwidth = 1) + 
+  #facet_wrap(~varname1) +
+  scale_fill_manual(values = var.colors, name = 'driver') + 
+  labs(x = 'year', y = 'standardized coefficient', title = 'Environmental Drivers over Time') + 
+  xlim(1960, 2010)
+
+ggplot() +
+  #geom_ribbon(data = data.bias, aes(x = year, ymin = bias05, ymax = bias95)) + 
+  geom_histogram(data=sing.terms, aes(x = year, weight = slope, fill = varname1), binwidth = 1) + 
+  facet_wrap(~varname1) +
+  scale_fill_manual(values = var.colors) + 
+  labs(x = 'year', y = 'standardized coefficient', title = 'Environmental Drivers over Time') + 
+  theme(legend.position = 'none') + 
+  xlim(1960, 2010)
+
+```
+
+# C. Comparing environmental drivers to species-level life processes 
+
+```{R, echo = FALSE, messages = FALSE, warnings = FALSE, include = FALSE}
+
+# Organizing life process data 
+life.all = data$life.melt %>% 
+  mutate(year = year - 1 + min(data.full$year))
+
+effects.df = data.frame(year = NA, varname = NA, slope = NA, species = NA, process = NA, cor = NA)
+
+for (i in seq_along(to_save_env$slope)){
+  
+  # get parameter name + data
+  var.now = to_save_env$varname1[i]
+  yr.now = to_save_env$year[i]
+  
+  # loop through birth
+  for (b in 1:length(spp)){
+    spp.now = spp[b]
+    compare.data = left_join(data.full %>% filter(year == yr.now),
+                             life.all %>% filter(year == yr.now, species == spp.now),
+                             by = c('ensemble'))
+    var.data = compare.data[[var.now]]
+    birth.data = compare.data$birth
+    wts.data = compare.data[['weight']]
+    
+    cor.now = corr(cbind(var.data, birth.data), w = wts.data) 
+    #cor.now = corr(cbind(var.data, birth.data))
+    if (abs(cor.now) >= 0.3){
+      to_add = data.frame(year = yr.now, varname = var.now, slope = to_save_env$slope[i], 
+                          species = spp.now, process = 'birth', cor = cor.now, stringsAsFactors = FALSE)
+      effects.df = rbind(effects.df, to_add)
+    }
+  }
+  
+  # loop through death
+  for (d in 1:length(spp)){
+    spp.now = spp[d]
+    compare.data = left_join(data.full %>% filter(year == yr.now),
+                             life.all %>% filter(year == yr.now, species == spp.now),
+                             by = c('ensemble'))
+    var.data = compare.data[[var.now]]
+    death.data = compare.data$death
+    wts.data = compare.data[['weight']]
+    
+    if (any(is.na(death.data))) death.data[is.na(death.data)] = 0
+    
+    cor.now = corr(cbind(var.data, death.data), w = wts.data) 
+    #cor.now = corr(cbind(var.data, death.data))
+    if (abs(cor.now) >= 0.3){
+      to_add = data.frame(year = yr.now, varname = var.now, slope = to_save_env$slope[i], 
+                          species = spp.now, process = 'death', cor = cor.now, stringsAsFactors = FALSE)
+      effects.df = rbind(effects.df, to_add)
+    }
+  }
+}
+
+effects.df = effects.df[-1,]
+```
+
+## Plotting effects on birth rates
+
+```{R, echo = FALSE}
+names(spec.colors) = spp
+
+data.plot = effects.df %>% filter(process == 'birth')
+pl = ggplot(data.plot) + 
+  geom_col(aes(x = year, y = cor, fill = as.factor(species))) + 
+  facet_wrap(~varname) + 
+  scale_fill_manual(values = spec.colors) + 
+  labs(x = 'year', y = 'correlation', title = 'effect of important environmental drivers on birth',
+       fill = 'species')
+pl
+    
+```
+
+## Plotting effects on death rates
+
+```{R, echo = FALSE}
+names(spec.colors) = spp
+
+data.plot = effects.df %>% filter(process == 'death')
+pl = ggplot(data.plot) + 
+  geom_col(aes(x = year, y = cor, fill = as.factor(species))) + 
+  facet_wrap(~varname) + 
+  scale_fill_manual(values = spec.colors) + 
+  labs(x = 'year', y = 'correlation', title = 'effect of important environmental drivers on death',
+       fill = 'species')
+pl
+```
+
+
+# Lastly, let's identify environmental drivers of adjusted PFT-level growth over time
+
+```{R, echo = FALSE, messages = FALSE, warnings = FALSE, include = FALSE}
+
+# create save data frame 
+to_save_env_pft = data.frame(year = NA, slope = NA, varname1 = NA, type = NA, pft = NA, 
+                         stringsAsFactors = FALSE) 
+
+for (s in seq_along(spp)){
+  
+  # gather data for species
+  data.full = data$run.list[[s]] %>%
+    dplyr::select(-pred, -bias) %>%
+    mutate(ensemble = ens) %>% 
+    dplyr::select(-ens)
+
+  # set up full model for year
+  vars.full = names(data.full)[which(!(names(data.full) %in% c('year','adj','weight','ensemble')))]
+  terms.full = vars.full 
+  eq.full = paste0('adj~',paste(terms.full, collapse='+'))
+
+  for (y in yrs){
+  
+    # gather data for year 
+    data.now = data.full %>% filter(year == y)
+
+    # check for lop-sided weights
+    cumwts = cumsum(sort(data.now$weight, decreasing = TRUE))
+    if (which(cumwts > 0.999999999)[1] <= 30) next 
+    
+    # refit model with scaled predictors to determine standardized coefficients
+    data.now.scaled = as.data.frame(scale(data.now %>% select(-ensemble, -year, -weight)))
+    data.now.scaled$weight = data.now$weight
+    
+    # run forward model selection
+    mod.full = lm(as.formula(eq.full), data = data.now, weights = data.now$weight)
+    mod.null = lm(adj~1, data = data.now, weights = data.now$weight)
+    n = length(data.now$weight)
+    forward.step.BIC = step(mod.null, k = log(n), direction="both",scope=list(upper=mod.full,lower=mod.null))
+
+    # check for null model 
+    if (length(rownames(coef(summary(forward.step.BIC)))[-1]) == 0) next
+  
+      # extract reduced model terms 
+    terms.reduced = rownames(coef(summary(forward.step.BIC)))[-1]
+    param.reduced = terms.reduced
+    param.reduced = c(param.reduced, 'adj')
+    slopes.reduced = coef(summary(forward.step.BIC))[-1,1]
+
+    # make into a dataframe for easier sorting
+    type = rep('single',length(terms.reduced))
+    varname1 = terms.reduced
+  
+    # add to save data frame
+    to_save_env_pft = rbind(to_save_env_pft, 
+                        data.frame(
+                          year = rep(y, length(slopes.reduced)),
+                          slope = slopes.reduced, 
+                          varname1 = varname1,
+                          type = type,
+                          pft = rep(spp[s], length(slopes.reduced)),
+                          stringsAsFactors = FALSE))
+  }
+}
+
+to_save_env_pft = to_save_env_pft[-1,]
+rownames(to_save_env_pft) = NULL
+```
+
+# B. Looking at environmental drivers through time 
+
+```{R, echo = FALSE}
+
+var.colors = c('salmon','slateblue','dodgerblue1','skyblue2', 
+               'red','green','black',"palegreen1", "gray", "goldenrod1")
+names(var.colors) = vars.full
+
+nyrs = length(unique(to_save_env_pft$year))
+
+for (s in seq_along(spp)){
+  
+  df.now = to_save_env_pft %>% filter(pft == spp[s], type == 'single')
+  
+  pl = ggplot() + 
+    geom_histogram(data = df.now, aes(x = year, weight = slope, fill = varname1), binwidth = 1) + 
+    scale_fill_manual(values = var.colors, name = 'driver') +
+    labs(x = 'year', y = 'standardized coefficient', title = paste(spp[s],': environmental drivers over time')) + 
+    xlim(1960, 2010)
+  print(pl)
+  
+}
+
+ggplot() + 
+  geom_bar(data = to_save_env_pft %>% filter(type == 'single'), 
+           aes(x = as.factor(pft), fill = as.factor(varname1)), position = 'dodge') + 
+  scale_fill_manual(values = var.colors) + 
+  labs(x = 'pft', y = 'importance', fill = 'driver',
+       title = paste0('driver appearances over all years'))
+
+ggplot() + 
+  geom_col(data = to_save_env_pft %>% 
+             filter(type == 'single') %>% 
+             group_by(pft, varname1) %>%
+             summarize(import = mean(slope)), 
+           aes(x = as.factor(varname1),y = import, fill = as.factor(varname1)), position = 'dodge') + 
+  scale_fill_manual(values = var.colors) + 
+  labs(x = element_blank(), y = 'importance', 
+       fill = 'driver', title = 'average slope over time') + 
+  facet_wrap(~pft) + 
+  theme(axis.ticks = element_blank(), 
+        axis.text.x = element_blank())
+
+```
+
+# Analysis Part II: Total model bias over time
+
+```{R, echo = FALSE}
+
+data$bias.melt %>% 
+  ggplot(aes(x = year + 1960, y = bias, col = ensemble, group = ensemble)) +
+  ylim(-1,1) +
+  geom_line(show.legend = FALSE) + 
+  labs(title = 'model error over time', x = 'year', y = 'relative model bias')
+
+```
+

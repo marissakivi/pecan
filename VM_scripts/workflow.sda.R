@@ -20,7 +20,7 @@ rm(list=ls())
 
 # For this step, you will need the workflow ID from your spin-up. Adjust the variable below accordingly.  
 
-ID = '14000000098'
+ID = '14000000233'
 
 # load necessary libraries
 library(dplyr)
@@ -30,6 +30,7 @@ library(PEcAn.uncertainty)
 library(PEcAn.LINKAGES)
 library(PEcAn.visualization)
 library(PEcAn.assim.sequential)
+library(PEcAn.logger)
 library(PEcAn.DB)
 library(PEcAn.remote)
 library(nimble)
@@ -37,12 +38,15 @@ library(lubridate)
 library(PEcAn.visualization)
 library(rgdal) # need to put in assim.sequential
 library(ncdf4) # need to put in assim.sequential
+library(corrplot)
 
 # source the assim.sequential functions that we will need 
-source('/home/acer/VM_scripts/assim.sequential.2/get_ensemble_weights.R')
-source('/home/acer/VM_scripts/assim.sequential.2/assess.params.R')
-source('/home/acer/VM_scripts/assim.sequential.2/Nimble_codes.R')
-source('/home/acer/VM_scripts/assim.sequential.2/Analysis_sda.R')
+source('/home/carya/VM_scripts/assim.sequential.2/get_ensemble_weights.R')
+source('/home/carya/VM_scripts/assim.sequential.2/assess.params.R')
+source('/home/carya/VM_scripts/assim.sequential.2/Nimble_codes.R')
+source('/home/carya/VM_scripts/assim.sequential.2/Analysis_sda.R')
+
+#source('/home/acer/models/linkages/R/write_restart.LINKAGES.R')
 
 # set working directory to workflow info
 setwd(paste0('/data/workflows/PEcAn_',ID))
@@ -76,6 +80,8 @@ setwd(paste0('/data/workflows/PEcAn_',ID))
         <variable.name>
           <variable.name>AGB.pft</variable.name>
         </variable.name>
+        <min_value>0</min_value>   # ""
+        <max_value>100000000</max_value>  # ""
       </file>
     </inputs>
     <state.variables>
@@ -106,7 +112,7 @@ setwd(paste0('/data/workflows/PEcAn_',ID))
 # to be assimilated into the model. 
 
 # load transformed and reformatted observation data 
-load('/data/dbfiles/sda.obs.HARVARD.Rdata')
+load('/data/dbfiles/sda.obs.ROOSTER.Rdata')
 obs.mean <- obs.list$obs.mean
 obs.cov <- obs.list$obs.cov
 
@@ -272,8 +278,8 @@ FORECAST    <- ANALYSIS <- list()
 enkf.params <- list()
 
 # shape parameters estimated over time for process covariance
-aqq         <- list()
-bqq         <- list()
+aqq         <- NULL
+bqq         <- numeric(nt + 1)
 
 # track range of state variables 
 # interval remade everytime depending on data at time t
@@ -484,6 +490,7 @@ for(t in t:nt){
   # the following chunk will print all of the state variable forecasts for each of the ensembles
 
   Sys.sleep(540) # the input is sleep time in seconds
+  #Sys.sleep(200)
   
   X_tmp <- vector("list", 2)
   X <- list()

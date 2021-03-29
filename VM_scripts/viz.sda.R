@@ -2,23 +2,29 @@
 # Marissa Kivi 
 # October 2019
 
+rm(list=ls())
+
 ## 1. set working directory to your SDA run 
-setwd('/data/workflows/PEcAn_14000000089')
+setwd('/data/workflows/PEcAn_14000000233')
 
 ## 2. write out species names for your run in the same order as you find them in the PFT folder of your working directory
 ## I didn't make this hard-coded because I wanted to keep things neat for nice plotting
 
-sppname = c('red maple','yellow birch','american beech','red oak','eastern hemlock') # HF
-#sppname = c('red maple','red spruce','white pine','red oak') # RH
-#sppname = c('red maple','american beech','white pine','white oak','red oak') # GE 
+#sppname = c('red maple','yellow birch','red oak','black oak','eastern hemlock') # HF
+sppname = c('red maple','red spruce','white pine','red oak') # RH
+#sppname = c('red maple','sugar maple','white pine','white oak','red oak') # GE 
 #sppname = c('sugar maple', 'yellow birch', 'american beech', 'white ash', 'eastern hemlock') # NRP12
+#sppname = c('red maple','white pine','red oak', 'eastern hemlock')
+#sppname = c('sugar maple', 'yellow birch', 'northern white cedar', 'eastern hemlock') #Sylvania
 
 ## 3. load your obs.list file for your run as well 
 
-load('/data/dbfiles/sda.obs.HARVARD.RData')
-#load('/data/dbfiles/sda.obs.ROOSTER.Rdata')
+load('/data/dbfiles/sda.obs.HARVARD.Rdata')
+load('/data/dbfiles/sda.obs.ROOSTER.Rdata')
 #load('/data/dbfiles/sda.obs.GOOSE.RData')
-#load('/data/dbfiles/sda.obs.NORTHROUND.plots12.Rdata')
+#load('/data/dbfiles/sda.obs.NORTHROUND.plot2.Rdata')
+#load('/data/dbfiles/sda.obs.NORTHROUND.plots34.Rdata')
+#load('/data/dbfiles/sda.obs.SYLVANIA.Rdata')
 
 ######################
 ## set up environment
@@ -117,7 +123,7 @@ agb.pft.obs.melt$year = agb.pft.obs.melt$year + years[1] - 1
 agb.pft.obs.melt$species = plyr::mapvalues(agb.pft.obs.melt$species, from = c(1:spp), to = sppname)
 agb.pft.obs.melt$species = as.factor(agb.pft.obs.melt$species)
 
-agb.pft.var.melt = melt(agb.pft.var)
+agb.pft.var.melt = reshape2::melt(agb.pft.var)
 names(agb.pft.var.melt) = c('year','species','agb.var')
 agb.pft.var.melt$species = plyr::mapvalues(agb.pft.var.melt$species, from = c(1:spp), to = sppname)
 agb.pft.var.melt$year = agb.pft.var.melt$year + years[1] - 1
@@ -179,7 +185,7 @@ adj.intervals = adj.agb.total.melt %>%
             b25 = quantile(agb,0.25),
             b75 = quantile(agb,0.75),
             mean.adj = mean(agb))
-just.mean.tot = adj.intervals %>% select(year, mean.adj)
+just.mean.tot = adj.intervals %>% dplyr::select(year, mean.adj)
 
 # plot-ready total model bias 
 bias.plot = bias.total.melt %>% group_by(year) %>%
@@ -196,7 +202,7 @@ bias.plot = bias.total.melt %>% group_by(year) %>%
 # first plot looks at the range of yearly predictions by LINKAGES prior to adjustment
 # black line is the observed data
 # red line is the adjusted mean
-just.mean = adj.pft.plot %>% select(year,species,mean.adj)
+just.mean = adj.pft.plot %>% dplyr::select(year,species,mean.adj)
 pl1 = left_join(pred.pft.plot, agb.pft.obs.melt, by = c('year','species'))  %>%
   left_join(just.mean, by = c('year','species')) %>%
   ggplot() +
@@ -265,7 +271,7 @@ pl2b = left_join(adj.pft.plot, agb.pft.obs.melt, by = c('year','species'))  %>%
   scale_fill_manual(values = c('90% adjusted'='coral2','50% adjusted'='rosybrown1'), name = 'intervals') +
   scale_color_manual(values = c('data'='black','adjusted mean'='red'),name =NULL)
 pl2b
-ggsave(plot = pl2, filename = './plots/adjusted-by-pft.fixed.jpg')
+ggsave(plot = pl2b, filename = './plots/adjusted-by-pft.fixed.jpg')
 
 # third plot looks at the range of total predicted biomass compared to the data and the adjusted values
 # data is shown by the black line
